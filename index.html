@@ -1,0 +1,1827 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&display=swap" rel="stylesheet">
+<title>Dragon Catcher</title>
+<style>
+    :root{--bg:#f2f0ec;--fg:#111;--bar:rgba(255,255,255,.7)}
+    @media (prefers-color-scheme:dark){:root{--bg:#0d0d0d;--fg:#eee;--bar:rgba(20,20,20,.7)}}
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+        width: 100%;
+        background-color: #030303;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #ffffff;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Canvas layers ── */
+    #silkcanvas {
+        position: fixed; top: 0; left: 0;
+        width: 100vw; height: 100vh; z-index: 1;
+    }
+    /* bones float over the silk; the dragon hunts the cursor plane in front */
+    #threecanvas {
+        position: fixed; top: 0; left: 0;
+        width: 100vw; height: 100vh; z-index: 2;
+        pointer-events: none;
+    }
+
+    /* ── Vignette overlay ── */
+    .overlay {
+        position: fixed; top: 0; left: 0;
+        width: 100%; height: 100%; z-index: 4;
+        pointer-events: none;
+        background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.94) 100%);
+    }
+
+
+    /* ── Stage / scenes ── */
+    #stage {
+        position: fixed; inset: 0;
+        overflow: hidden;
+        isolation: isolate;
+        z-index: 5;
+        background: transparent;
+    }
+    #spacer { height: 1300vh; }
+
+    .scene {
+        position: absolute; inset: 0;
+        visibility: hidden;
+        touch-action: pan-y;
+        cursor: grab;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+    .scene.on { visibility: visible; }
+    .scene.drag { cursor: grabbing; }
+
+    .vp { position: absolute; inset: 0; }
+    .stage { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+    .card { position: absolute; left: 0; top: 0; background: #888; overflow: hidden; backface-visibility: visible; }
+    .card img,.card video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
+
+    .hint {
+        position: absolute;
+        left: 16px; top: max(14px, env(safe-area-inset-top));
+        text-transform: uppercase; letter-spacing: .06em;
+        opacity: .7; pointer-events: none; z-index: 5;
+    }
+
+    #peek { position: absolute; right: 16px; top: max(14px, env(safe-area-inset-top)); width: 210px; z-index: 5; pointer-events: none; }
+    .pf { position: relative; width: 210px; height: 132px; background: #0001; overflow: hidden; }
+    .pl { position: absolute; inset: 0; animation: pin .35s ease-out both; }
+    .pl img,.pl video { width: 100%; height: 100%; object-fit: cover; }
+    @keyframes pin { from { filter: blur(14px); opacity: 0 } to { filter: blur(0); opacity: 1 } }
+    .pm { display: flex; justify-content: space-between; margin-top: 6px; text-transform: uppercase; }
+
+    #map { position: absolute; left: 10px; top: 10px; width: 184px; height: 265px; background: #fff; z-index: 5; pointer-events: none; }
+    #map canvas { width: 100%; height: 100%; display: block; }
+
+    #pg { perspective: 525px; perspective-origin: 50% 50%; }
+    #world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+    .it { position: absolute; overflow: hidden; background: #888; }
+    .it img,.it video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; transform: scale(1.4); }
+
+    /* ── Transition layers ── */
+    .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; z-index: 10; }
+    .fx.on { opacity: 1; }
+    .px { position: absolute; inset: 0; display: flex; pointer-events: none; opacity: 0; z-index: 10; }
+    .px.on { opacity: 1; }
+    .px div { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+    .px i { flex: none; background: #393939; opacity: 0; }
+
+    /* ── HERO SCENE ── */
+    .hero-scene {
+        background: transparent;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 14px;
+    }
+    .hero-image {
+        position: absolute; inset: 0;
+        z-index: 7;
+        background-image: url('https://pub-6738c828bef548d69b3f13bdd680b5b0.r2.dev/Sig.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+        animation: imageFadeIn 2s cubic-bezier(0.06, 1, 0.03, 1) reverse;
+        opacity: 0;
+        pointer-events: none;
+    }
+    @keyframes imageFadeIn {
+        0%   { opacity: 0; transform: translateY(18px) scale(110.97); }
+        100% { opacity: 1; transform: translateY(0)   scale(2);    }
+    }
+
+    .hero-copy {
+        position: absolute;
+        left: clamp(18px, 5vw, 74px);
+        bottom: clamp(88px, 15vh, 170px);
+        z-index: 6;
+        pointer-events: none;
+        max-width: min(600px, 74vw);
+    }
+    .hero-copy .eyebrow {
+        font-size: 10px; letter-spacing: .44em; text-transform: uppercase;
+        opacity: .5; margin-bottom: 20px;
+    }
+    .hero-copy h1 {
+        font-family: 'Pirata One', 'Old English Text MT', serif;
+        font-size: clamp(44px, 8vw, 110px);
+        line-height: .95; letter-spacing: .01em; font-weight: 400;
+        text-transform: none;
+    }
+    .hero-copy .sub {
+        margin-top: 20px;
+        font-size: 11px; line-height: 1.7; letter-spacing: .09em;
+        text-transform: uppercase; opacity: .55; max-width: 32ch;
+    }
+
+    .cue {
+        position: absolute; left: 50%; bottom: 26px;
+        transform: translateX(-50%);
+        z-index: 6; pointer-events: none;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        font-size: 9px; letter-spacing: .34em; text-transform: uppercase; opacity: .5;
+    }
+    .cue i {
+        display: block; width: 1px; height: 36px;
+        background: linear-gradient(#fff, transparent);
+        animation: cueDrop 2.1s ease-in-out infinite;
+    }
+    @keyframes cueDrop {
+        0%, 100% { transform: scaleY(.35); transform-origin: top; opacity: .3 }
+        50%      { transform: scaleY(1);   transform-origin: top; opacity: 1  }
+    }
+
+    /* ── OUTRO ── */
+    #s-outro { display: flex; align-items: center; justify-content: center; }
+    .outro {
+        text-align: center; text-transform: uppercase;
+        display: flex; flex-direction: column; align-items: center; gap: 22px;
+        padding: 24px;
+    }
+    .outro img { width: min(240px, 52vw); height: auto; opacity: .9; filter: drop-shadow(0 10px 40px rgba(0,0,0,.35)); }
+    .outro h2 { font-size: clamp(18px, 3vw, 30px); letter-spacing: .2em; font-weight: 500; }
+    .outro p { font-size: 10px; letter-spacing: .3em; opacity: .55; }
+    .outro button {
+        margin-top: 6px;
+        font: inherit; font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+        color: inherit; background: none; cursor: pointer;
+        border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
+        padding: 11px 22px;
+        transition: background .25s ease, color .25s ease;
+    }
+    .outro button:hover { background: var(--fg); color: var(--bg); }
+
+    /* ── UI ── */
+    #ui {
+        position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom));
+        z-index: 30;
+        display: flex; gap: 10px; align-items: center;
+        text-transform: uppercase; letter-spacing: .16em; font-size: 10px;
+        color: var(--fg);
+        background: var(--bar);
+        backdrop-filter: blur(10px);
+        padding: 7px 11px;
+        border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+        font-family: ui-monospace, Menlo, monospace;
+        pointer-events: none;
+    }
+    #rail {
+        position: fixed; left: 0; bottom: 0;
+        width: 100%; height: 2px; z-index: 30;
+        background: #ffffff;
+        mix-blend-mode: difference;
+        transform-origin: 0 50%;
+        transform: scaleX(0);
+        pointer-events: none;
+    }
+</style>
+</head>
+<body>
+
+<!-- Canvas layers -->
+<canvas id="silkcanvas"></canvas>
+<canvas id="threecanvas"></canvas>
+
+<!-- Vignette -->
+<div class="overlay"></div>
+
+<!-- ══ STAGE ══ -->
+<div id="stage">
+
+    <!-- 1 · HERO -->
+    <section class="scene on hero-scene" id="s-hero">
+        <div class="hero-image"></div>
+        <div class="hero-copy">
+            <p class="eyebrow">Specimen Nº 01 — Winged &amp; Wanted</p>
+            <h1>Dragon Catcher</h1>
+            <p class="sub">A skeleton reaches. A dragon refuses. Move your cursor — try to catch it.</p>
+        </div>
+        <div class="cue"><span>Scroll</span><i></i></div>
+    </section>
+
+    <!-- 2 · WHEEL -->
+    <section class="scene" id="s-wheel">
+        <div class="vp" id="wv"><div class="stage" id="ws"></div></div>
+        <div class="hint">Wheel · scroll, drag or move the cursor</div>
+        <div id="peek"><div class="pf" id="pf"></div><div class="pm"><span id="pn">—</span><span id="py">—</span></div></div>
+    </section>
+
+    <!-- 3 · SPHERE -->
+    <section class="scene" id="s-sphere">
+        <div class="vp" id="sv"><div class="stage" id="ss"></div></div>
+        <div class="hint">Sphere · drag to orbit, scroll to dolly, pinch on touch</div>
+    </section>
+
+    <!-- 4 · PATH -->
+    <section class="scene" id="s-path">
+        <div class="vp" id="pg"><div id="world"></div></div>
+        <div id="map"><canvas></canvas></div>
+        <div class="hint" style="left:210px">Path · scroll to ride the knot, move cursor to lean</div>
+    </section>
+
+    <!-- 5 · OUTRO -->
+    <section class="scene" id="s-outro">
+        <div class="outro">
+            <img src="https://pub-6738c828bef548d69b3f13bdd680b5b0.r2.dev/Sig.png" alt="">
+            <h2>Premium Digital Silk</h2>
+            <p>Wheel · Sphere · Path</p>
+            <button id="top">Back to top</button>
+        </div>
+    </section>
+
+    <div class="px" id="px"></div>
+</div>
+
+<div id="spacer"></div>
+<div id="rail"></div>
+<div id="ui"><span>scroll &darr;</span><span id="step">01 / 05</span></div>
+
+
+
+<!-- ── SILK WEBGL BACKGROUND ── -->
+<script>
+(function() {
+    const canvas = document.getElementById('silkcanvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return;
+
+    const vertices = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    const vsSource = `attribute vec2 a_position; void main(){gl_Position=vec4(a_position,0.0,1.0);}`;
+    const fsSource = `
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+        #else
+        precision mediump float;
+        #endif
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform vec2 u_mouse;
+        float getHeight(vec2 p,float t){
+            vec2 q=vec2(cos(p.x+t*0.93)+cos(p.y+t*0.02),cos(p.x-t*0.2)+cos(p.y-t*0.3));
+            vec2 r=vec2(sin((p.x+q.x)*0.02+t*0.4)+tan((p.y+q.y)+1.2+t*0.3),cos((p.x+q.x)*1.2-t*0.3)+sin((p.y+q.y)*1.2-t*0.4));
+            vec2 s=vec2(sin((p.x+r.x)*1.5+t*0.5)+cos((p.y+r.y)*1.5+t*0.4),cos((p.x+r.x)*1.5-t*0.4)+sin((p.y+r.y)*1.5-t*0.5));
+            float val=cos(p.x*1.0+s.x*1.0)*cos(p.y*1.0+s.y*1.0);
+            return 1.0-pow(val*val+0.01,0.75);
+        }
+        void main(){
+            vec2 uv=gl_FragCoord.xy/u_resolution.xy;
+            vec2 cuv=uv*2.0-1.0;
+            cuv.x*=u_resolution.x/u_resolution.y;
+            float t=u_time*0.01;
+            vec2 p=cuv*1.8;
+            p-=u_mouse*2.9;
+            float h=getHeight(p,t);
+            float eps=2.0;
+            float hx=getHeight(p+vec2(eps,0.0),t);
+            float hy=getHeight(p+vec2(0.0,eps),t);
+            vec3 normal=normalize(vec3(-(hx-h)/eps,-(hy-h)/eps,2.5));
+            vec3 view_dir=normalize(vec3(0.0,0.0,1.0));
+            vec3 l1_dir=normalize(vec3(1.2,1.0,0.8));
+            vec3 l1_col=vec3(0.5,0.08,0.82);
+            vec3 l2_dir=normalize(vec3(1.5,-1.0,0.5));
+            vec3 l2_col=vec3(0.2,2.5,0.53);
+            vec3 base_col=vec3(0.01,0.04,1.2);
+            float diff1=max(dot(normal,l1_dir),0.0);
+            float diff2=max(dot(normal,l2_dir),0.0);
+            vec3 h1=normalize(l1_dir+view_dir);
+            float spec1=pow(max(dot(normal,h1),0.0),95.0);
+            vec3 h2=normalize(l2_dir+view_dir);
+            float spec2=pow(max(dot(normal,h2),0.0),65.0);
+            float fresnel=pow(0.6-max(dot(normal,view_dir),0.0),5.0);
+            vec3 rim_col=vec3(1.4,0.45,0.5)*fresnel*0.5;
+            vec3 color=base_col;
+            color+=l1_col*diff1*0.08;
+            color+=l2_col*diff2*0.12;
+            color+=l1_col*spec1*1.5;
+            color+=l2_col*spec2*0.3;
+            color+=rim_col;
+            float ao=clamp((h+0.5)*6.6,0.1,1.0);
+            color*=ao;
+            float vignette=0.2-smoothstep(0.94,2.5,length(cuv));
+            color*=vignette;
+            float noise=fract(sin(dot(gl_FragCoord.xy,vec2(0.0008,0.233)))*43758.5453)*1.05;
+            color+=noise*0.010;
+            color=color/(1.0+color);
+            color=pow(color,vec3(0.01/20.0));
+            gl_FragColor=vec4(color,16.0);
+        }
+    `;
+
+    function compileShader(gl,src,type){
+        const s=gl.createShader(type);
+        gl.shaderSource(s,src); gl.compileShader(s);
+        if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));return null;}
+        return s;
+    }
+    const vs=compileShader(gl,vsSource,gl.VERTEX_SHADER);
+    const fs=compileShader(gl,fsSource,gl.FRAGMENT_SHADER);
+    const prog=gl.createProgram();
+    gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog); gl.useProgram(prog);
+
+    const posLoc=gl.getAttribLocation(prog,'a_position');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc,2,gl.FLOAT,false,0,0);
+
+    const resLoc=gl.getUniformLocation(prog,'u_resolution');
+    const timeLoc=gl.getUniformLocation(prog,'u_time');
+    const mouseLoc=gl.getUniformLocation(prog,'u_mouse');
+
+    let mx=0,my=0,tx=0,ty=0;
+    window.addEventListener('mousemove',e=>{tx=(e.clientX/window.innerWidth)*2-1;ty=-(e.clientY/window.innerHeight)*2+1;});
+    window.addEventListener('touchmove',e=>{tx=(e.touches[0].clientX/window.innerWidth)*2-1;ty=-(e.touches[0].clientY/window.innerHeight)*2+1;},{passive:true});
+
+    function resize(){
+        const dpr=Math.min(window.devicePixelRatio||1,2);
+        canvas.width=window.innerWidth*dpr; canvas.height=window.innerHeight*dpr;
+        gl.viewport(0,0,canvas.width,canvas.height);
+    }
+    window.addEventListener('resize',resize); resize();
+
+    const start=Date.now();
+    function render(){
+        const t=(Date.now()-start)*0.008;
+        mx+=(tx-mx)*0.05; my+=(ty-my)*0.005;
+        gl.uniform2f(resLoc,canvas.width,canvas.height);
+        gl.uniform1f(timeLoc,t);
+        gl.uniform2f(mouseLoc,mx,my);
+        gl.drawArrays(gl.TRIANGLES,0,6);
+        requestAnimationFrame(render);
+    }
+    render();
+})();
+</script>
+
+
+
+<!-- ── THREE.JS + SKELETON GLB · GRABBY ── -->
+<script type="module">
+
+import * as THREE from 'https://esm.sh/three@0.160.0';
+import { GLTFLoader } from 'https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+
+/* ============================================================
+   GRABBY SKELETON — tries to grab your cursor
+   ------------------------------------------------------------
+   HOW IT WORKS
+   - Head / neck / spine / clavicles lean toward the cursor
+   - Shoulder (DEF-Humerus) + elbow (DEF-Ulna) do real two-bone
+     IK so the wrist (MECH-Wrist) reaches for the cursor
+   - Wrist flicks toward cursor motion, fingers curl into a
+     fist as the hand gets close, jaw drops when excited
+   TUNE HERE ↓ (all safe to play with)
+   ============================================================ */
+const TUNE = {
+  armFollow: 0.11,     // arm snappiness (0.05 lazy … 0.30 twitchy) — lower = less snap
+  handFollow: 0.11,
+  headFollow: 0.07,    // head/neck follow speed — heads are fast and curious
+  headMaxDeg: 46,
+  headTiltDeg: 7,     // curious side-tilt toward the cursor
+  neckFollow: 0.04,
+  neckMaxDeg: 34,        // REGIONAL total: neck CTRL + C1-C7 below (keep their sum here)
+  neckCtrlMaxDeg: 14,   // neck CTRL's share (kink-free: the rest rides on C1-C7)
+  vertCervMax: 3,       // each cervical vertebra (7x3 = 21, totals 35)
+  thorCtrlMaxDeg: 4,    // thoracic CTRL share (of 11 regional)
+  vertThorMax: 0.6,     // each thoracic vertebra (12x0.6 = 7.2, totals ~11)
+  lumbCtrlMaxDeg: 5,    // lumbar CTRL share (of 14 regional)
+  vertLumbMax: 1.8,     // each lumbar vertebra (5x1.8 = 9, totals 14)
+  spineMaxDeg: 11,    // thoracic: turns + leans + breathes
+  lumbarFollow: 0.02, // lumbar: slow heavy base turn
+  lumbarMaxDeg: 14,
+  pelvisFollow: 0.015,// pelvis: barely squares toward the cursor
+  pelvisMaxDeg: 5,
+  leanRollDeg: 8,     // whole-torso side lean into the cursor
+  breatheDeg: 0.9,    // idle breathing amplitude on the chest
+  wanderDeg: 1.6,     // idle head drift when the cursor sits still
+  standoff: 0.85,      // × arm length: cursor floats this far in front of the chest — constant everywhere on screen
+  grabRadius: 1.1,     // × arm length: hands start closing inside this, full fist at ~0.25×
+  jawOpen: 0.28,       // radians of jaw drop at full excitement (positive opens — chin arcs down-back, uppers stay ahead)
+  jawBack: 0.0,        // world-u the whole jaw sits back (0 = model rest; raise if lowers poke past uppers)
+  velLo: 1.5,        // world-u/s: below this the stopped hand closes fully around the cursor
+  velHi: 8.0,         // world-u/s: above this fast motion opens the hand…
+  velAmt: 0.8,        // …by this much (0.8 = only 20% curl left while flying)
+  handAimFollow: 0.14, // hand pointing speed (0 = hands keep rest dangle — the bug you saw)
+  handAimMaxDeg: 38,  // max wrist turn toward the cursor — capped so wrists can't twist/cross
+  farWeight: 0.32,     // relax floor for the yielding arm, applied continuously (no handover snap)
+  wristYaw: 0.0,       // wrist sideways follow — keep 0, arm IK already aims the hand
+  clavFollow: 0.055,   // collarbones: shrug/roll toward the cursor (slow bones — keep ≤0.08 or shoulders jitter)
+  clavElevUpDeg: 11,   // collar lift when the cursor is high (anatomy caps ~10-12°)
+  clavElevDownDeg: 5,  // collar drop when the cursor is low (depression is smaller)
+  clavProtMaxDeg: 9,   // reach-forward swing of the reaching shoulder (retract on the other side)
+  clavBreatheDeg: 0.4, // idle shrug so the shoulders never sit dead
+  scapFollow: 0.05,    // shoulder blades glide with the reach (children of the clavicles, so motion adds)
+  scapMaxDeg: 12,
+  idleAfter: 5,        // s of no cursor before the skeleton idles and performs for itself
+  dragonSize: 0.022,   // dragon body length as fraction of skeleton height (bee-scale)
+  dragonLead: 0.35,    // s the dragon anticipates the cursor's motion (aims where you're headed)
+  dragonYaw0: 0,       // add PI here if the model flies tail-first (check screenshot)
+  introDur: 5,         // s of flyby intro: dragon starts huge, stoops past the camera, shrinks onto the skeleton
+  introSize: 30,       // how many × bee-size the dragon starts (fills the view, then whips past)
+};
+
+const canvas = document.getElementById('threecanvas');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+
+const FOV = 10;
+const camera = new THREE.PerspectiveCamera(FOV, window.innerWidth / window.innerHeight, 0.001, 500);
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.14);
+scene.add(ambient);
+const keyLight = new THREE.DirectionalLight(0xf2e4cc, 1.5);
+keyLight.position.set(2, 2, 3); keyLight.castShadow = true;
+scene.add(keyLight);
+const fill = new THREE.DirectionalLight(0x8899bb, 1.2);
+fill.position.set(-3, 1, -2);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xaabbcc, 1.8);
+rim.position.set(0, 3, -4);
+scene.add(rim);
+
+function resize() {
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+const _rawMouseTarget = new THREE.Vector3(0, 0, 0);
+const mouseWorld      = new THREE.Vector3(0, 0, 0);
+const _prevRaw        = new THREE.Vector3(0, 0, 0);
+let cursorSpeed = 0;
+let mouseVel = 0; // smoothed world-units/sec of the cursor (drives finger opening)
+const _prevSmooth = new THREE.Vector3(0, 0, 0);
+let smoothInit = false;
+const cursorVelVec = new THREE.Vector3(0, 0, 0); // smoothed cursor velocity vector (the dragon leads it)
+const _prevVel = new THREE.Vector3(0, 0, 0);
+let lastInputT = -100; // s timestamp of last cursor input — skeleton idles 5 s after this
+let seenInput = false;   // idle never triggers before the user's first mouse move (fresh load = neutral)
+let idleAmt = 0;       // 0 tracking … 1 full idle choreography (slow-smoothed)
+const drive = new THREE.Vector3(0, 0, 0); // actual pose target: cursor when live, idle path when idle
+const idlePath = new THREE.Vector3(0, 0, 0); // idle torso point: squared-up wander that leans toward the dragon
+const headTgt = new THREE.Vector3(0, 0, 0);  // head/neck target: cursor when live, the dragon when idle
+const chinPt = new THREE.Vector3(0, 0, 0);   // idle thinker: left-hand target at the chin
+const mandRestPos = new THREE.Vector3(0, 0, 0); // mandible bind position (jaw-back correction offsets from here)
+let driveInit = false;
+
+const mouse      = new THREE.Vector2(0, 0);
+const raycaster  = new THREE.Raycaster();
+// Fixed-depth cursor plane: floats standoff × arm-length in front of the
+// chest, constant no matter where the cursor is on screen.
+const mousePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+let cursorPlaneZ = 0;
+let planeSeeded = false;
+// — midline ownership: ONE hand owns the cursor near center, the other guards.
+// ownerMix: 0 = +x hand (humL) owns, 1 = −x hand owns. Target flips only past a
+// wide hysteresis margin; the mix itself is slow-smoothed, so handovers glide
+// instead of snapping. By construction the hands never share one point. —
+let ownerMix = 0.5, ownerMixTarget = 0.5, ownerInit = false;
+let lastArmX = 0; // shoulder midline from last frame (idle path + dragon volume anchor)
+
+function updateMouse(cx, cy) {
+    lastInputT = performance.now() * 0.001; seenInput = true;
+    mouse.x = (cx / window.innerWidth)  *  2 - 1;
+    mouse.y = (cy / window.innerHeight) * -2 + 1;
+    mousePlane.constant = -cursorPlaneZ;
+    raycaster.setFromCamera(mouse, camera);
+    _prevRaw.copy(_rawMouseTarget);
+    if (raycaster.ray.intersectPlane(mousePlane, _rawMouseTarget)) {
+      const d = _prevRaw.distanceTo(_rawMouseTarget);
+      // crude per-event speed (world units); smoothed in animate()
+      cursorSpeed = cursorSpeed * 0.7 + Math.min(d * 60, 30) * 0.3;
+    }
+}
+window.addEventListener('mousemove', e => updateMouse(e.clientX, e.clientY));
+window.addEventListener('touchmove', e => updateMouse(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+window.addEventListener('pointerdown', () => { lastInputT = performance.now() * 0.001; });
+window.addEventListener('wheel', () => { lastInputT = performance.now() * 0.001; }, { passive: true });
+
+const bones     = {};
+const restQuats = {};
+const vertRest  = {}; // individual vertebra meshes: C1-C7, T1-T12, L1-L5
+const vertCur   = {};
+const ribMeshes = []; // rib cage meshes (also rig-root bolted — ride them on the thorax)
+let bonesReady  = false;
+function isVertebra(n) { return /^(C[1-7]|T\d+|L[1-5])_n3d$/.test(n); }
+
+const BONE_MAP = {
+    head:      'DEF-Skull_n3d',
+    mandible:  'DEF-Mandible_n3d',
+    neck:      'CTRL-Spine_Cervical',
+    thorUpper: 'CTRL-Spine_Thoracic_n3d',
+    lumbar:    'CTRL-Spine_Lumbar_n3d',
+    pelvis:    'CTRL_Pelvis_n3d',
+    sternum:   'DEF-Sternum_n3d', // front chest wall (bolted to rig root — drive it w/ thorax)
+    lumbar:    'CTRL-Spine_Lumbar_n3d',
+    pelvis:    'CTRL_Pelvis_n3d',
+    clavL:     'DEF-Clavicle%2EL_n3d',
+    clavR:     'DEF-Clavicle%2ER_n3d',
+    scapL:     'DEF-Scapula%2EL_n3d',
+    scapR:     'DEF-Scapula%2ER_n3d',
+    humL:      'DEF-Humerus%2EL_n3d',
+    humR:      'DEF-Humerus%2ER_n3d',
+    ulnaL:     'DEF-Ulna%2EL_n3d',
+    ulnaR:     'DEF-Ulna%2ER_n3d',
+    radiusL:   'DEF-Radius%2EL_n3d',
+    radiusR:   'DEF-Radius%2ER_n3d',
+    wristL:    'MECH-Wrist%2EL_n3d',
+    wristR:    'MECH-Wrist%2ER_n3d',
+    carpL:     'DEF-Carpals%2EL_n3d',
+    carpR:     'DEF-Carpals%2ER_n3d',
+};
+
+// fingers: every DEF-Metacarpal / Phalanges bone, grouped per side
+// type weights how much it curls at full fist (proximal curls most)
+const fingersL = [];
+const fingersR = [];
+function fingerType(name) {
+    // three.js runtime uses underscores (DEF-Proximal_Phalanges_5%2EL_n3d); glTF JSON has spaces — accept both.
+    // Exclude feet/toes (contain foot/feet/metatarsal).
+    const n = name.toLowerCase();
+    if (n.includes('foot') || n.includes('feet') || n.includes('metatarsal') || n.includes('tarsal') || n.includes('toe')) return null;
+    if (n.includes('metacarp')) return { t: 'meta', w: 0.28 };
+    if (n.includes('proximal') && n.includes('phalang')) return { t: 'prox', w: 1.0 };
+    if (n.includes('intermediate') && n.includes('phalang')) return { t: 'mid', w: 1.05 };
+    if (n.includes('distal') && n.includes('phalang')) return { t: 'dist', w: 0.75 };
+    return null;
+}
+
+const loader = new GLTFLoader();
+loader.load(
+    'https://pub-a56d70d158b1414d83c3856ea210601c.r2.dev/Skele.glb',
+    gltf => {
+        const model = gltf.scene;
+
+        const rawBox  = new THREE.Box3().setFromObject(model);
+        const rawSize = rawBox.getSize(new THREE.Vector3());
+        const scale   = 15.2 / Math.max(rawSize.x, rawSize.y, rawSize.z);
+        model.scale.setScalar(scale);
+
+        const scaledBox    = new THREE.Box3().setFromObject(model);
+        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+        model.position.set(-scaledCenter.x, -scaledBox.min.y, -scaledCenter.z);
+
+        const finalBox = new THREE.Box3().setFromObject(model);
+        const totalH   = finalBox.max.y - finalBox.min.y;
+
+        const cropBottom  = finalBox.min.y + totalH * 0.64;
+        const cropTop     = finalBox.max.y;
+        const cropMidY    = (cropBottom + cropTop) * 0.5;
+        const cropH       = cropTop - cropBottom;
+        const halfFovRad  = THREE.MathUtils.degToRad(FOV / 2);
+        const camZ        = (cropH * 0.5 / Math.tan(halfFovRad)) * 1.15;
+
+        camera.position.set(0, cropMidY, camZ);
+        camera.lookAt(0, cropMidY, 0);
+        camera.updateProjectionMatrix();
+
+        mouseWorld.set(0, cropMidY, 0);
+        _rawMouseTarget.set(0, cropMidY, 0);
+        _prevRaw.set(0, cropMidY, 0);
+
+        model.traverse(obj => {
+            if (isVertebra(obj.name)) { vertRest[obj.name] = obj.quaternion.clone(); vertCur[obj.name] = obj.quaternion.clone(); obj.userData.vertBone = obj; }
+            if (/^Rib.*_n3d$/.test(obj.name)) { ribMeshes.push(obj); vertRest[obj.name] = obj.quaternion.clone(); vertCur[obj.name] = obj.quaternion.clone(); }
+            for (const [k, name] of Object.entries(BONE_MAP)) {
+                if (obj.name === name) {
+                    bones[k]     = obj;
+                    restQuats[k] = obj.quaternion.clone();
+                }
+            }
+            const ft = fingerType(obj.name);
+            if (ft && obj.name.startsWith('DEF-') && obj.name.endsWith('_n3d')) {
+                const isL = obj.name.includes('%2EL');
+                const isR = obj.name.includes('%2ER');
+                if (isL) fingersL.push({ bone: obj, rest: obj.quaternion.clone(), ...ft, finger: 3 });
+                else if (isR) fingersR.push({ bone: obj, rest: obj.quaternion.clone(), ...ft, finger: 3 });
+            }
+        });
+
+        function digitOf(n) {
+            const m = n.match(/([1-5])%2E/);
+            return m ? +m[1] : 3;
+        }
+        // re-tag finger number now that helper exists (traverse ran before definition hoisting-safe)
+        for (const rec of [...fingersL, ...fingersR]) {
+            const m = rec.bone.name.match(/[_\s]([1-5])%2E/);
+            rec.finger = m ? +m[1] : 3;
+        }
+
+        skelH = totalH; chestY = cropMidY; camBase.copy(camera.position); camRestored = false;
+        if (dragon && !dragonScaled) { dragon.scale.setScalar(Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5)); dragonScaled = true; }
+        scene.add(model);
+        initCurrentQuats();
+        if (bones.mandible) { // jaw-back correction (one-time rigid offset, rides the skull)
+            mandRestPos.copy(bones.mandible.position);
+            bones.mandible.parent.getWorldQuaternion(_pWorldQ);
+            // bone-local positions are pre-scale model units: world→local needs /scale
+            _dDir.set(0, 0, -TUNE.jawBack / scale).applyQuaternion(_pWorldQ.invert());
+            bones.mandible.position.add(_dDir);
+        }
+        scene.updateMatrixWorld(true);
+        wallCapture();
+        bonesReady = true;
+        console.log('[grabby] bones:', Object.keys(bones), 'fingers L/R:', fingersL.length, fingersR.length);
+    },
+    undefined,
+    err => console.error('GLB load error:', err)
+);
+
+const _boneWorldPos = new THREE.Vector3();
+const _pWorldQ      = new THREE.Quaternion();
+const _rWorldQ      = new THREE.Quaternion();
+const _deltaQ       = new THREE.Quaternion();
+const _targetQ      = new THREE.Quaternion();
+const _localTarget  = new THREE.Quaternion();
+const _scratchEuler = new THREE.Euler();
+
+const currentQuats = {};
+
+function initCurrentQuats() {
+    for (const k of Object.keys(bones)) currentQuats[k] = restQuats[k].clone();
+    for (const rec of [...fingersL, ...fingersR]) rec.cur = rec.rest.clone();
+}
+
+function lerpAlpha(alpha60, dt) {
+    return 1.0 - Math.pow(1.0 - alpha60, dt * 60.0);
+}
+const clamp = THREE.MathUtils.clamp;
+const sstep = THREE.MathUtils.smoothstep;
+
+function applyLookat(key, bone, restQuat, cursorWorld, alpha60, maxAngleDeg, dt, o) {
+    o = o || {};
+    bone.getWorldPosition(_boneWorldPos);
+    let dx = cursorWorld.x - _boneWorldPos.x;
+    let dy = cursorWorld.y - _boneWorldPos.y;
+    // normalized: full turn reached ~2.5 world units out (screen edge), proportional inside
+    const max = THREE.MathUtils.degToRad(maxAngleDeg);
+    let yaw   = clamp(dx / 2.5, -1, 1) * max;
+    let pitch = clamp(-dy / 2.5, -1, 1) * max * 0.6;
+    if (o.wander) {
+      // idle life: slow small-arc drift when the cursor sits still (sines stay smooth)
+      const t = performance.now() * 0.001;
+      const still = 1 - clamp(mouseVel / 3, 0, 1);
+      const wob = THREE.MathUtils.degToRad(o.wander) * still;
+      yaw += (Math.sin(t * 0.5) * 0.6 + Math.sin(t * 0.23 + 1.0) * 0.4) * wob;
+      pitch += Math.cos(t * 0.34 + 0.5) * 0.6 * wob;
+    }
+    const rollT = o.tilt ? clamp(dx * 0.012, -THREE.MathUtils.degToRad(o.tilt), THREE.MathUtils.degToRad(o.tilt)) : 0;
+    _scratchEuler.set(pitch, yaw, rollT, 'YXZ');
+    _deltaQ.setFromEuler(_scratchEuler);
+    _targetQ.copy(restQuat).multiply(_deltaQ);
+    currentQuats[key].slerp(_targetQ, lerpAlpha(alpha60, dt));
+    bone.quaternion.copy(currentQuats[key]);
+}
+
+function applySpine(key, bone, restQuat, cursorWorld, alpha60, maxAngleDeg, dt, o) {
+    o = o || {};
+    bone.getWorldPosition(_boneWorldPos);
+    const dx  = cursorWorld.x - _boneWorldPos.x;
+    const max = THREE.MathUtils.degToRad(maxAngleDeg);
+    const yaw   = clamp(dx / 2.5, -1, 1) * max;
+    const pitch = clamp(-(cursorWorld.y - _boneWorldPos.y) / 2.0, -1, 1) * max * 0.35;
+    // side lean into the cursor + slow breathing so the torso never sits dead
+    const rollMax = THREE.MathUtils.degToRad(o.roll != null ? o.roll : 0);
+    const roll = clamp(-dx / 2.5, -1, 1) * rollMax;
+    let breathe = 0;
+    if (o.breathe) breathe = Math.sin(performance.now() * 0.001 * Math.PI * 2 * 0.25 + (o.phase || 0)) * THREE.MathUtils.degToRad(o.breathe);
+    _scratchEuler.set(pitch + breathe, yaw, roll, 'YXZ');
+    _deltaQ.setFromEuler(_scratchEuler);
+    _targetQ.copy(restQuat).multiply(_deltaQ);
+    currentQuats[key].slerp(_targetQ, lerpAlpha(alpha60, dt));
+    bone.quaternion.copy(currentQuats[key]);
+}
+
+function applyClav(key, bone, restQuat, cursorWorld, follow, side, dt, o) {
+    o = o || {};
+    bone.getWorldPosition(_boneWorldPos);
+    const dy   = cursorWorld.y - _boneWorldPos.y;
+    const dx   = cursorWorld.x - _boneWorldPos.x;
+    const sgnX = side === 'L' ? 1.0 : -1.0;
+    // normalized like the spine/neck solvers: full swing reached at the screen
+    // edge (~2 world units out), proportional inside. Up-lift is bigger than
+    // downward press (real collarbones elevate ~11°, depress ~5°); the reaching
+    // shoulder swings forward while the other side retracts (differential).
+    const upMax   = THREE.MathUtils.degToRad(o.elevUp != null ? o.elevUp : 11);
+    const downMax = THREE.MathUtils.degToRad(o.elevDown != null ? o.elevDown : 5);
+    const protMax = THREE.MathUtils.degToRad(o.prot != null ? o.prot : 9);
+    const t = clamp(dy / 2.0, -1, 1);
+    const elevRad = t >= 0 ? t * upMax : t * downMax;
+    const protRad = clamp(dx * sgnX / 2.5, -1, 1) * protMax;
+    // faint side-roll into the reach + slow shrug so idle shoulders stay alive
+    const rollMax = THREE.MathUtils.degToRad(o.roll != null ? o.roll : 2);
+    const roll = clamp(dx * sgnX / 2.5, -1, 1) * rollMax;
+    let breathe = 0;
+    if (o.breathe) breathe = Math.sin(performance.now() * 0.001 * Math.PI * 2 * 0.25 + (o.phase || 0)) * THREE.MathUtils.degToRad(o.breathe);
+    _scratchEuler.set(elevRad + breathe, protRad, roll, 'XYZ');
+    _deltaQ.setFromEuler(_scratchEuler);
+    _targetQ.copy(restQuat).multiply(_deltaQ);
+    currentQuats[key].slerp(_targetQ, lerpAlpha(follow, dt));
+    bone.quaternion.copy(currentQuats[key]);
+}
+
+/* ── ARM REACH (two-bone IK toward the cursor) ───────────────────────
+   Shoulder → elbow → wrist is solved with the law of cosines, so the
+   elbow bends and the arm extends/retracts to reach the cursor.
+   The cursor lives on a fixed plane floating in front of the chest
+   (standoff × arm length toward the camera), so depth is constant
+   everywhere on screen and hands never dive through the ribs. */
+const ARM_POLE = new THREE.Vector3(0.6, -1, -0.25);  // elbow hint: down, outward, slightly back
+const _V = Array.from({ length: 10 }, () => new THREE.Vector3());
+const _qDelta = new THREE.Quaternion();
+const _Tfull = new THREE.Vector3();
+const _homeW = new THREE.Vector3();
+
+function reachArm(hKey, uKey, hBone, uBone, wristBone, cursor, centerX, torsoHalf, alpha60, dt, out) {
+    const a = lerpAlpha(alpha60, dt);
+    out.ok = false;
+    if (!out.pole) { out.pole = new THREE.Vector3(0.6 * (out.side || 1), -1, -0.25).normalize(); }
+    if (!out.sUpper) { out.sUpper = new THREE.Vector3(0, -1, 0); out.sFore = new THREE.Vector3(0, -1, 0); out.initDir = false; }
+    // Reset both joints so measurements aren't polluted by last frame
+    hBone.quaternion.copy(restQuats[hKey]);
+    uBone.quaternion.copy(restQuats[uKey]);
+    hBone.updateWorldMatrix(true, true);
+
+    const S = _V[0], E = _V[1], W = _V[2], upperRest = _V[3], u = _V[4], upperDir = _V[5], poleD = _V[6], eOff = _V[7], foreRest = _V[9];
+    hBone.getWorldPosition(S);
+    uBone.getWorldPosition(E);
+    const L1 = S.distanceTo(E);
+    if (L1 < 1e-6) return;
+    wristBone.getWorldPosition(W);
+    const L2 = E.distanceTo(W);
+    if (L2 < 1e-6) return;
+    upperRest.subVectors(E, S).divideScalar(L1);
+    foreRest.subVectors(W, E).divideScalar(L2);
+
+    const side = S.x >= centerX ? 1 : -1;
+    out.side = side;
+    const Ltot = L1 + L2;
+
+    // — ownership: this arm's share of the cursor (1 = sole owner).
+    // Hysteresis + slow mix (updated in animate) so handovers glide, never snap.
+    const ownW = ownerInit ? (side === 1 ? 1 - ownerMix : ownerMix) : 1;
+    // — continuous cross-yield as well (keeps the guard arm out of the chest) —
+    const over = (centerX - cursor.x) * side;
+    const allow = torsoHalf * 0.55;
+    const yieldAmt = sstep(over, allow * 0.4, allow + torsoHalf * 0.6); // 0 own side → 1 deep cross
+    const r = 1 - (1 - TUNE.farWeight) * Math.max(yieldAmt, 1 - ownW); // owner→1, guard→farWeight
+
+    // Target: cursor on its fixed floating plane — depth is constant everywhere.
+    _Tfull.set(cursor.x, cursor.y, cursor.z);
+    const overT = (centerX - _Tfull.x) * side;
+    if (overT > allow) _Tfull.x = centerX - side * (allow + (overT - allow) * 0.15);
+    // — midline separation: at center both hands would land on the same point and
+    // interpenetrate. Offset each hand outward so they flank the cursor instead. —
+    {
+      const midProx = 1 - sstep(Math.abs(cursor.x - centerX), torsoHalf * 0.35, torsoHalf * 1.5);
+      _Tfull.x += side * midProx * Ltot * 0.11; // total gap 0.22×arm ≈ hand width
+    }
+    const dx = _Tfull.x - S.x;
+    const dy = _Tfull.y - S.y;
+    let dz = _Tfull.z - S.z; // constant outward standoff — same at screen edges as center
+    dz *= 0.35 + 0.65 * r; // yielding arm hangs slightly back instead of crossing through
+    u.set(dx, dy, dz);
+    const distFull = Math.max(u.length(), 1e-6);
+    u.divideScalar(distFull);
+    u.lerp(upperRest, 1 - r).normalize();
+
+    // — min reach: parking the hand right on top of the shoulder folds the elbow flat,
+    // where tiny cursor moves swing the whole arm (the whip). Push close targets out/down/forward.
+    let distFullW = distFull;
+    if (distFullW < Ltot * 0.5) {
+      _V[8].set(side * 0.5, -0.6, 0.55).normalize();
+      const k = (Ltot * 0.5 - distFullW) / (Ltot * 0.5); // 0 far → 1 on top of joint
+      u.lerp(_V[8], k * 0.75 * (out.minPush != null ? out.minPush : 1)).normalize();
+      distFullW = Ltot * 0.5;
+    }
+
+    const dist = clamp(distFullW * r + Ltot * 0.55 * (1 - r), Math.abs(L1 - L2) + 1e-4, Ltot * 0.999);
+
+    const cosA = clamp((L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist), -1, 1);
+    const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+    poleD.copy(ARM_POLE); poleD.x *= side;
+    poleD.addScaledVector(u, -poleD.dot(u));
+    if (poleD.lengthSq() > 1e-8) {
+      poleD.normalize();
+      // smooth the pole — kills the elbow snap when u passes near the pole
+      out.pole.lerp(poleD, lerpAlpha(0.08, dt)).normalize();
+    }
+    eOff.copy(u).multiplyScalar(L1 * cosA).addScaledVector(out.pole, L1 * sinA);
+    upperDir.copy(eOff).divideScalar(L1);
+    if (r < 0.999) upperDir.lerp(upperRest, 1 - r).normalize();
+    out.fore.copy(u).multiplyScalar(dist).sub(eOff).divideScalar(L2).normalize();
+    if (r < 0.999) out.fore.lerp(foreRest, 1 - r).normalize();
+    // — direction damping: smooth solved dirs before they become quats (kills residual pops) —
+    if (!out.initDir) { out.sUpper.copy(upperDir); out.sFore.copy(out.fore); out.initDir = true; }
+    else {
+      const prox = clamp(distFullW / Ltot, 0, 1); // small when target hugs the shoulder
+      const da = lerpAlpha(0.16 * (0.35 + 0.65 * prox), dt);
+      out.sUpper.lerp(upperDir, da).normalize();
+      out.sFore.lerp(out.fore, da).normalize();
+    }
+    out.Ltot = Ltot;
+    out.shZ = S.z;
+    out.ok = true;
+
+    // Upper arm: rotate rest direction onto solved direction (world space), convert to local.
+    _qDelta.setFromUnitVectors(upperRest, out.sUpper);
+    if (hBone.parent) hBone.parent.getWorldQuaternion(_pWorldQ); else _pWorldQ.identity();
+    _rWorldQ.copy(_pWorldQ).multiply(restQuats[hKey]);
+    _targetQ.copy(_qDelta).multiply(_rWorldQ);
+    _localTarget.copy(_pWorldQ).invert().multiply(_targetQ);
+    currentQuats[hKey].slerp(_localTarget, a);
+    hBone.quaternion.copy(currentQuats[hKey]);
+}
+
+function reachForearm(uKey, uBone, alpha60, dt, out) {
+    const a = lerpAlpha(alpha60, dt);
+    if (!out.ok) {
+        currentQuats[uKey].slerp(restQuats[uKey], a);
+        uBone.quaternion.copy(currentQuats[uKey]);
+        return;
+    }
+    uBone.quaternion.copy(restQuats[uKey]);
+    uBone.updateWorldMatrix(true, true);          // picks up the upper arm's new pose
+    uBone.getWorldPosition(_V[0]);
+    _boneWorldPos.copy(_V[0]);
+    // current forearm dir (elbow → wrist) right now
+    const wrist = out.wristBone;
+    wrist.getWorldPosition(_V[1]);
+    _V[1].sub(_V[0]);
+    if (_V[1].lengthSq() < 1e-12) return;
+    _V[1].normalize();
+    _qDelta.setFromUnitVectors(_V[1], out.sFore || out.fore);
+    if (uBone.parent) uBone.parent.getWorldQuaternion(_pWorldQ); else _pWorldQ.identity();
+    _rWorldQ.copy(_pWorldQ).multiply(restQuats[uKey]);
+    _targetQ.copy(_qDelta).multiply(_rWorldQ);
+    _localTarget.copy(_pWorldQ).invert().multiply(_targetQ);
+    currentQuats[uKey].slerp(_localTarget, a);
+    uBone.quaternion.copy(currentQuats[uKey]);
+}
+
+// wrist: slight FLEXION with the grab (+X is palm-ward, verified) — arm IK aims
+// the hand, so no look-at here (the old dx/dy yaw twisted wrists). Never extend (-X).
+function applyWrist(key, wristBone, carpBone, cursor, grab, alpha60, dt) {
+    if (!wristBone) return;
+    const a = lerpAlpha(alpha60, dt);
+    _scratchEuler.set(clamp(grab * 0.12, -0.1, 0.3), 0, 0, 'YXZ');
+    _deltaQ.setFromEuler(_scratchEuler);
+    _targetQ.copy(restQuats[key]).multiply(_deltaQ);
+    if (!currentQuats[key]) currentQuats[key] = restQuats[key].clone();
+    currentQuats[key].slerp(_targetQ, a);
+    wristBone.quaternion.copy(currentQuats[key]);
+    const ck = key === 'wristL' ? 'carpL' : 'carpR';
+    const cb = carpBone;
+    if (cb && restQuats[ck]) {
+      _scratchEuler.set(grab * 0.08, 0, 0, 'XYZ');
+      _deltaQ.setFromEuler(_scratchEuler);
+      _targetQ.copy(restQuats[ck]).multiply(_deltaQ);
+      if (!currentQuats[ck]) currentQuats[ck] = restQuats[ck].clone();
+      currentQuats[ck].slerp(_targetQ, a);
+      cb.quaternion.copy(currentQuats[ck]);
+    }
+}
+
+// HAND AIM — point the fingers at the cursor.
+// IK places the wrist; without this the hand keeps its hanging rest angle and the
+// curled fingers just dangle downward. This rotates the wrist (capped + smoothed)
+// so the hand's long axis (wrist→knuckles) aims at the cursor — palm facing it —
+// then finger curl wraps around the point. Cap keeps wrists twist-free.
+const _aimCur = new THREE.Vector3();
+const _aimWant = new THREE.Vector3();
+const _aimQ = new THREE.Quaternion();
+const _aimI = new THREE.Quaternion();
+function aimHand(key, wristBone, knuckleBone, cursorWorld, alpha60, maxDeg, dt) {
+    if (!wristBone || !knuckleBone) return;
+    wristBone.getWorldPosition(_boneWorldPos);
+    knuckleBone.getWorldPosition(_aimCur);
+    _aimCur.sub(_boneWorldPos);
+    if (_aimCur.lengthSq() < 1e-10) return;
+    _aimCur.normalize();
+    _aimWant.copy(cursorWorld).sub(_boneWorldPos);
+    if (_aimWant.lengthSq() < 1e-10) return;
+    _aimWant.normalize();
+    const ang = _aimCur.angleTo(_aimWant);
+    if (ang < 1e-3) return;
+    _aimQ.setFromUnitVectors(_aimCur, _aimWant);
+    const max = THREE.MathUtils.degToRad(maxDeg);
+    if (ang > max) _aimQ.slerp(_aimI.identity(), 1 - max / ang); // cap the turn
+    if (wristBone.parent) wristBone.parent.getWorldQuaternion(_pWorldQ); else _pWorldQ.identity();
+    // world-delta → local: newLocal = P⁻¹ · q · P · currentLocal
+    _rWorldQ.copy(_pWorldQ).multiply(currentQuats[key] || restQuats[key]);
+    _targetQ.copy(_aimQ).multiply(_rWorldQ);
+    _localTarget.copy(_pWorldQ).invert().multiply(_targetQ);
+    if (!currentQuats[key]) currentQuats[key] = restQuats[key].clone();
+    currentQuats[key].slerp(_localTarget, lerpAlpha(alpha60, dt));
+    wristBone.quaternion.copy(currentQuats[key]);
+}
+
+// per-vertebra solver: same cursor-tracking math as the region CTRL, but each
+// vertebra only carries its small share — the column bends as a smooth S-curve
+// instead of kinking at 3 joints. Shares are budgeted in TUNE (sums = old maxes).
+// RIB CAGE + STERNUM DRIVER — these meshes hang off the rig root (static), so
+// rotating them in place would just spin them. Instead each frame we rigidly
+// carry them on the thoracic wave: R = measured world-delta of the thoracic
+// CTRL, pivoting about the live T7 position. Full swing + breath pump included.
+const _wall = { meshes: [], rest: {}, t7rest: new THREE.Vector3(), R: new THREE.Quaternion(), P: new THREE.Vector3(), Pw: new THREE.Quaternion(), Q: new THREE.Quaternion(), Q2: new THREE.Quaternion(), V: new THREE.Vector3() };
+function wallCapture() {
+    _wall.meshes.length = 0; _wall.rest = {};
+    scene.traverse(function (o) {
+      if (o.name === 'Sternum_n3d' || /^Rib.*_n3d$/.test(o.name)) {
+        o.updateWorldMatrix(true, false);
+        _wall.meshes.push(o);
+        _wall.rest[o.name] = { pos: o.getWorldPosition(new THREE.Vector3()).clone(), quat: o.getWorldQuaternion(new THREE.Quaternion()).clone() };
+      }
+      if (o.name === 'T7_n3d') _wall.t7rest.copy(o.getWorldPosition(new THREE.Vector3()));
+    });
+}
+function wallDrive() {
+    if (!_wall.meshes.length || !bones.thorUpper) return;
+    const b = bones.thorUpper;
+    b.parent.getWorldQuaternion(_wall.Pw);
+    // R = current-world * rest-world⁻¹ of the thoracic CTRL (folds in ancestors)
+    _wall.Q.copy(_wall.Pw).multiply(b.quaternion);
+    _wall.Q2.copy(_wall.Pw).multiply(restQuats.thorUpper).invert();
+    _wall.R.copy(_wall.Q).multiply(_wall.Q2);
+    let t7 = null;
+    scene.traverse(function (o) { if (!t7 && o.name === 'T7_n3d') t7 = o; });
+    if (!t7) return;
+    _wall.P.copy(t7.getWorldPosition(new THREE.Vector3()));
+    for (const m of _wall.meshes) {
+      const r = _wall.rest[m.name];
+      if (!r) continue;
+      _wall.V.copy(r.pos).sub(_wall.t7rest).applyQuaternion(_wall.R).add(_wall.P);
+      m.parent.updateWorldMatrix(true, false);
+      m.position.copy(m.parent.worldToLocal(_wall.V.clone()));
+      m.parent.getWorldQuaternion(_wall.Q);
+      _wall.Q.invert();
+      // r.quat is WORLD rest; convert: local = parentWorld⁻¹ * R * restWorld
+      m.quaternion.copy(_wall.Q).multiply(_wall.R).multiply(r.quat);
+    }
+}
+const _vertV = new THREE.Vector3();
+function applyVert(mesh, cursorWorld, follow, maxDeg, rollMax, dt, breathe, phase) {
+    if (!mesh) return;
+    const key = mesh.name;
+    mesh.getWorldPosition(_vertV);
+    const dx = cursorWorld.x - _vertV.x;
+    const max = THREE.MathUtils.degToRad(maxDeg);
+    const yaw = clamp(dx / 2.5, -1, 1) * max;
+    const pitch = clamp(-(cursorWorld.y - _vertV.y) / 2.0, -1, 1) * max * 0.35;
+    const roll = clamp(-dx / 2.5, -1, 1) * THREE.MathUtils.degToRad(rollMax);
+    let br = 0;
+    if (breathe) br = Math.sin(performance.now() * 0.001 * Math.PI * 2 * 0.25 + (phase || 0)) * THREE.MathUtils.degToRad(breathe);
+    _scratchEuler.set(pitch + br, yaw, roll, 'YXZ');
+    _deltaQ.setFromEuler(_scratchEuler);
+    _targetQ.copy(vertRest[key]).multiply(_deltaQ);
+    vertCur[key].slerp(_targetQ, lerpAlpha(follow, dt));
+    mesh.quaternion.copy(vertCur[key]);
+}
+
+// fingers: close into a grip as grab → 1. Local X is the flexion axis
+// (verified: +X moves the fingertip toward the wrist; Y is the long axis).
+// Joint weights live in rec.w (meta .28 / prox 1 / mid 1.05 / dist .75).
+// Firm grip, NOT white-knuckle: total chain curl ≈ 2.4 rad so tips meet the
+// palm without driving through it. No sideways splay — that snapped them.
+const _fEuler = new THREE.Euler();
+const _fQ = new THREE.Quaternion();
+function applyFingers(list, grab, dt) {
+    const a = lerpAlpha(0.20, dt);
+    // idle breathing so open hands never look dead
+    const breathe = Math.sin(performance.now() * 0.0016) * 0.03;
+    for (const rec of list) {
+        const isThumb = rec.finger === 1;
+        if (isThumb) {
+            // thumb opposition runs through the METACARPAL: +X on meta_1 moves the
+            // thumb tip toward the fingertips (measured align 0.97). Y-twist alone
+            // moves nothing (tip sits on the Y axis) — curl leads, twist just orients.
+            let curl;
+            if (rec.t === 'meta') curl = (0.10 + breathe + grab * 1.50) * rec.w;
+            else if (rec.t === 'prox') curl = (0.07 + breathe + grab * 0.90) * rec.w;
+            else curl = (0.07 + breathe + grab * 0.60) * rec.w; // distal
+            _fEuler.set(curl, -0.12 - grab * 0.15, 0, 'XYZ');
+        } else {
+            // fingers: middle leads, slight fan so tips land side-by-side, not stacked
+            const scale = rec.finger === 3 ? 1.0 : rec.finger === 2 ? 0.95 : rec.finger === 4 ? 0.96 : 0.88;
+            const curl = (0.07 + breathe) * rec.w + grab * rec.w * 0.80 * scale;
+            const fan = (rec.finger - 3) * 0.045;
+            _fEuler.set(curl, 0, fan, 'XYZ');
+        }
+        _fQ.setFromEuler(_fEuler);
+        _targetQ.copy(rec.rest).multiply(_fQ);
+        rec.cur.slerp(_targetQ, a);
+        rec.bone.quaternion.copy(rec.cur);
+    }
+}
+
+const armOutL = { ok: false, fore: new THREE.Vector3(), wristBone: null, Ltot: 1, pole: null, side: 1, sUpper: null, sFore: null, initDir: false };
+const armOutR = { ok: false, fore: new THREE.Vector3(), wristBone: null, Ltot: 1, pole: null, side: -1, sUpper: null, sFore: null, initDir: false };
+let grabL = 0, grabR = 0, excite = 0;
+window.__grabby = { get grabL(){return grabL}, get grabR(){return grabR}, get mouseVel(){return mouseVel}, get idleAmt(){return idleAmt}, get dragonReady(){return dragonReady}, get introT(){return introT}, TUNE };
+// ── debug handle (bones + dragon, for live verification) ──
+window.__replayIntro = function(){ introT = 0; introLast = -1; }; // debug: replay the flyby
+window.__D = { bones, restQuats, vertRest, vertCur, fingersL, fingersR, camera, scene, renderer, THREE, get mouseWorld(){return mouseWorld}, get drive(){return drive}, get dragon(){return dragon}, get dragonVel(){return dragonVel}, get idleAmt(){return idleAmt}, get introT(){return introT}, get camBase(){return camBase} };
+
+// ══ MINI DRAGON — bee-scale chase target ═══════════════════════
+let dragon = null, dragonMixer = null, dragonScaled = false;
+const dragonVel = new THREE.Vector3(0.6, 0.1, 0);
+let dragonReady = false, dragonYaw = 0, dragonRoll = 0, dragonYawInit = false;
+let skelH = 15.2, chestY = 5;
+let introT = 0; // 0→1 flyby intro: huge stoop past the camera, shrink onto the skeleton
+let introLast = -1; // wall-clock stamp so load jank can't fast-forward the flyby
+const camBase = new THREE.Vector3(0, 12, 64); // camera home (corrected on skeleton load)
+const shakeVec = new THREE.Vector3(); // intro camera shake offset
+let camRestored = false;
+const _dTarget = new THREE.Vector3(), _dWant = new THREE.Vector3(), _dDir = new THREE.Vector3();
+const _dEuler = new THREE.Euler(), _dQ = new THREE.Quaternion();
+function initDragon() {
+    new GLTFLoader().load(
+        'https://user.uploads.dev/file/415e6c7fb51e2c48620feb112a36bdb4.glb',
+        gltf => {
+            dragon = gltf.scene;
+            dragon.scale.setScalar(Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5));
+            dragon.position.set(lastArmX + 1.2, chestY + 1.0, cursorPlaneZ);
+            scene.add(dragon);
+            if (gltf.animations && gltf.animations.length) {
+                dragonMixer = new THREE.AnimationMixer(dragon);
+                const act = dragonMixer.clipAction(gltf.animations[0]);
+                act.setLoop(THREE.LoopRepeat, Infinity);
+                act.play(); // the 41-tick wing flap, seamless on repeat
+            }
+            dragonReady = true;
+            console.log('[dragon] ready');
+        },
+        undefined,
+        err => console.error('dragon GLB error:', err)
+    );
+}
+initDragon();
+// Banked-flight steering: the target LEADS the cursor by dragonLead seconds so
+// the dragon aims where you're headed, darting around the point; on idle it
+// cruises lazy loops around the torso. Nose follows velocity, roll = the turn.
+function updateDragon(dt, t) {
+    if (!dragonReady) return;
+    if (dragonMixer) dragonMixer.update(dt * (introT < 1 ? 2.4 : (0.75 + Math.min(dragonVel.length(), 6) * 0.12)));
+    if (!planeSeeded) return;
+    const lead = _dTarget.copy(drive).addScaledVector(cursorVelVec, TUNE.dragonLead);
+    lead.x += (Math.sin(t * 2.13) + 0.5 * Math.sin(t * 3.71 + 1.3)) * 0.55;
+    lead.y += (Math.sin(t * 1.73 + 0.5) + 0.5 * Math.sin(t * 2.93 + 0.2)) * 0.42;
+    lead.z = cursorPlaneZ + Math.sin(t * 1.31 + 0.7) * 0.3;
+    lead.x = clamp(lead.x, lastArmX - 3.4, lastArmX + 3.4);
+    lead.y = clamp(lead.y, chestY - 2.8, chestY + 2.8);
+    lead.z = clamp(lead.z, cursorPlaneZ - 0.9, cursorPlaneZ + 0.9);
+    _dWant.set(
+        lastArmX + Math.sin(t * 0.45) * 2.6 + Math.sin(t * 0.83 + 1.0) * 0.5,
+        chestY + 0.4 + Math.sin(t * 0.63 + 1.0) * 1.7,
+        cursorPlaneZ + Math.sin(t * 0.31 + 2.0) * 0.7);
+    _dTarget.copy(lead).lerp(_dWant, idleAmt);
+    if (introT < 1) {
+        // INTRO FLYBY — starts huge hovering, stoops at the camera (shake + fov kick
+        // peak as it whips past), re-enters small and lands exactly on the chase target.
+        const cx = lastArmX, cy = chestY, pz = cursorPlaneZ;
+        const bx = camBase.x, by = camBase.y, bz = camBase.z;
+        const s01 = (a, b) => { const u = clamp((introT - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+        let m;
+        _dDir.set(bx, by - 1, bz + 6); // W0: behind the lens, off-screen
+        // entrance from behind the camera: near pass through the frame, recedes shrinking to the skeleton
+        if (introT < 0.25) { const u = s01(0, 0.25); _dDir.lerp(_V[9].set(bx + 0.3, by + 0.3, bz - 6), u); m = 10; }
+        else if (introT < 0.6) { const u = s01(0.25, 0.6); _dDir.set(bx + 0.3, by + 0.3, bz - 6).lerp(_V[9].set(cx + 2, cy + 1.5, pz + 10), u); m = 10 - 7.5 * u; }
+        else if (introT < 0.8) { const u = s01(0.6, 0.8); _dDir.set(cx + 2, cy + 1.5, pz + 10).lerp(_V[9].set(cx + 4, cy + 2.5, pz), u); m = 2.5 - 1.5 * u; }
+        else { const u = s01(0.8, 1); _dDir.set(cx + 4, cy + 2.5, pz).lerp(_dTarget, u); m = 1; }
+        _dDir.sub(dragon.position);
+        if (dt > 1e-4) dragonVel.copy(_dDir).divideScalar(Math.max(dt, 1e-4)); // segment velocity → faces travel dir
+        dragon.position.add(_dDir); // snap to path point (deterministic, not frame-rate sculpted)
+        dragon.scale.setScalar(Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5) * Math.max(m, 1));
+    }
+    else {
+    _dDir.copy(_dTarget).sub(dragon.position);
+    const dist = _dDir.length();
+    if (dist > 1e-4) {
+        _dDir.divideScalar(dist);
+        dragonVel.lerp(_dWant.copy(_dDir).multiplyScalar(clamp(dist * 2.5, 1.1, 6.0)), 1 - Math.exp(-dt * 3.0));
+    }
+    dragon.position.addScaledVector(dragonVel, dt);
+    }
+    const sp = dragonVel.length();
+    if (sp > 0.05) {
+        _dDir.copy(dragonVel).divideScalar(sp);
+        const yaw = Math.atan2(_dDir.x, _dDir.z);
+        if (!dragonYawInit) { dragonYaw = yaw; dragonYawInit = true; }
+        let dyaw = yaw - dragonYaw;
+        while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+        while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+        const yawRate = dyaw / Math.max(dt, 1e-3);
+        dragonYaw = yaw;
+        dragonRoll += (clamp(-yawRate * 0.38, -0.7, 0.7) - dragonRoll) * (1 - Math.exp(-dt * 6));
+        _dEuler.set(-Math.asin(clamp(_dDir.y, -1, 1)), yaw + TUNE.dragonYaw0, dragonRoll, 'YXZ');
+        _dQ.setFromEuler(_dEuler);
+        dragon.quaternion.slerp(_dQ, 1 - Math.exp(-dt * 9));
+    }
+}
+
+const clock = new THREE.Clock();
+const MOUSE_ALPHA60 = 1.0;
+
+const _vertCache = {};
+function vertMeshByName(n) {
+    if (_vertCache[n] === undefined) {
+      let found = null;
+      if (typeof scene !== 'undefined') scene.traverse(function (o) { if (!found && o.name === n) found = o; });
+      _vertCache[n] = found;
+    }
+    return _vertCache[n];
+}
+let _knL = null, _knR = null;
+function knuckleL() {
+    if (!_knL) _knL = (fingersL.find(r => r.bone.name.includes('Proximal_Phalanges_3%2E')) || fingersL[0])?.bone || null;
+    return _knL;
+}
+function knuckleR() {
+    if (!_knR) _knR = (fingersR.find(r => r.bone.name.includes('Proximal_Phalanges_3%2E')) || fingersR[0])?.bone || null;
+    return _knR;
+}
+
+function handGrab(wristBone, Ltot) {
+    wristBone.getWorldPosition(_boneWorldPos);
+    const d = _boneWorldPos.distanceTo(drive);
+    const dn = d / Math.max(Ltot, 1e-4);
+    // open past ~grabRadius× arm length, full fist inside ~0.25×
+    return 1 - sstep(dn, 0.28, TUNE.grabRadius);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 1.5);
+    cursorSpeed *= Math.exp(-dt * 3);
+
+    const ma = lerpAlpha(MOUSE_ALPHA60, dt);
+    mouseWorld.x += (_rawMouseTarget.x - mouseWorld.x) * ma;
+    mouseWorld.y += (_rawMouseTarget.y - mouseWorld.y) * ma;
+    mouseWorld.z += (_rawMouseTarget.z - mouseWorld.z) * ma;
+    if (!driveInit) { drive.copy(mouseWorld); _prevVel.copy(mouseWorld); driveInit = true; }
+    // cursor velocity vector (the dragon leads the cursor with this)
+    {
+        _V[8].copy(mouseWorld).sub(_prevVel).divideScalar(Math.max(dt, 1e-3));
+        if (_V[8].length() < 60) cursorVelVec.lerp(_V[8], lerpAlpha(0.10, dt));
+        _prevVel.copy(mouseWorld);
+    }
+    // idle: ~5 s after last input the skeleton performers for itself
+    {
+        const tNow = performance.now() * 0.001;
+        if (lastInputT < 0) lastInputT = tNow;
+        idleAmt += (((seenInput) ? sstep(tNow - lastInputT, TUNE.idleAfter, TUNE.idleAfter + 2.0) : 0) - idleAmt) * lerpAlpha(0.8, dt);
+        if (dragonReady && planeSeeded && introT < 1) { // wall clock, not frame dt (load hitches eat frames)
+            const nowS = performance.now() * 0.001;
+            if (introLast < 0) introLast = nowS;
+            introT = Math.min(1, introT + (nowS - introLast) / TUNE.introDur);
+            introLast = nowS;
+        }
+    }
+
+    if (bonesReady && _rawMouseTarget.lengthSq() > 0) {
+        // drive = where the skeleton performs: the cursor when live, a slow
+        // choreography when idle (wander, glance at each hand, square up).
+        {
+            const t = performance.now() * 0.001;
+            idlePath.set(
+                lastArmX + Math.sin(t * 0.9) * 0.9 + Math.sin(t * 0.37 + 1.7) * 0.7,
+                chestY + 0.6 + Math.sin(t * 0.66 + 0.4) * 0.9 + Math.sin(t * 1.31) * 0.25,
+                cursorPlaneZ + Math.sin(t * 0.53 + 2.1) * 0.35);
+            if (dragonReady) { // squared-up torso leans after the cruising dragon
+                idlePath.x += (clamp(dragon.position.x, lastArmX - 3.4, lastArmX + 3.4) - idlePath.x) * 0.3;
+                idlePath.y += (clamp(dragon.position.y, chestY - 2.8, chestY + 2.8) - idlePath.y) * 0.15;
+            }
+            drive.lerp(_V[9].copy(mouseWorld).lerp(idlePath, idleAmt), 1 - Math.exp(-dt * 2.2)); // glide cursor↔idle
+        }
+        if (bones.pelvis) applySpine('pelvis', bones.pelvis, restQuats.pelvis, drive, TUNE.pelvisFollow, TUNE.pelvisMaxDeg, dt, { roll: 2 });
+        if (bones.lumbar) applySpine('lumbar', bones.lumbar, restQuats.lumbar, drive, TUNE.lumbarFollow, TUNE.lumbCtrlMaxDeg, dt, { roll: 2 });
+        for (let i = 1; i <= 5; i++) { const m = vertMeshByName('L' + i + '_n3d'); if (m) applyVert(m, drive, TUNE.lumbarFollow, TUNE.vertLumbMax, 0.72, dt, 0, 0); }
+        if (bones.thorUpper) applySpine('thorUpper', bones.thorUpper, restQuats.thorUpper, drive, 0.03, TUNE.thorCtrlMaxDeg, dt, { roll: 3, breathe: 0.3 });
+        for (let i = 1; i <= 12; i++) { const m = vertMeshByName('T' + i + '_n3d'); if (m) applyVert(m, drive, 0.03, TUNE.vertThorMax, 0.42, dt, 0.05, i * 0.35); }
+        wallDrive(); // chest wall (sternum + ribs) rides the thoracic wave about T7
+        if (dragonReady) headTgt.copy(drive).lerp(dragon.position, idleAmt); else headTgt.copy(drive);
+        if (bones.neck) applyLookat('neck', bones.neck, restQuats.neck, headTgt, TUNE.neckFollow, TUNE.neckCtrlMaxDeg, dt, { tilt: TUNE.headTiltDeg * 0.6 });
+        for (let i = 1; i <= 7; i++) { const m = vertMeshByName('C' + i + '_n3d'); if (m) applyVert(m, headTgt, TUNE.neckFollow, TUNE.vertCervMax, 0.5, dt, 0, 0); }
+        if (bones.head) applyLookat('head', bones.head, restQuats.head, headTgt, TUNE.headFollow, TUNE.headMaxDeg, dt, { tilt: TUNE.headTiltDeg, wander: TUNE.wanderDeg });
+        if (bones.clavL) applyClav('clavL', bones.clavL, restQuats.clavL, drive, TUNE.clavFollow, 'L', dt, { elevUp: TUNE.clavElevUpDeg, elevDown: TUNE.clavElevDownDeg, prot: TUNE.clavProtMaxDeg, breathe: TUNE.clavBreatheDeg, phase: 0, roll: 2 });
+        if (bones.clavR) applyClav('clavR', bones.clavR, restQuats.clavR, drive, TUNE.clavFollow, 'R', dt, { elevUp: TUNE.clavElevUpDeg, elevDown: TUNE.clavElevDownDeg, prot: TUNE.clavProtMaxDeg, breathe: TUNE.clavBreatheDeg, phase: Math.PI, roll: 2 });
+        if (bones.scapL) applyLookat('scapL', bones.scapL, restQuats.scapL, drive, TUNE.scapFollow, TUNE.scapMaxDeg, dt);
+        if (bones.scapR) applyLookat('scapR', bones.scapR, restQuats.scapR, drive, TUNE.scapFollow, TUNE.scapMaxDeg, dt);
+
+        let armCenterX = 0, armHalf = 1;
+        if (bones.humL && bones.humR) {
+            bones.humL.getWorldPosition(_V[0]);
+            bones.humR.getWorldPosition(_V[1]);
+            armCenterX = (_V[0].x + _V[1].x) * 0.5;
+            armHalf    = Math.max(Math.abs(_V[0].x - _V[1].x) * 0.5, 1e-3);
+            lastArmX = armCenterX;
+            // ownership target with wide hysteresis margin; mix chases it slowly
+            {
+              const margin = armHalf * 0.9;
+              if (!ownerInit) {
+                ownerMixTarget = drive.x >= armCenterX ? 0 : 1;
+                ownerMix = ownerMixTarget;
+                ownerInit = true;
+              } else if (ownerMixTarget === 0 && drive.x < armCenterX - margin) {
+                ownerMixTarget = 1;
+              } else if (ownerMixTarget === 1 && drive.x > armCenterX + margin) {
+                ownerMixTarget = 0;
+              }
+              ownerMix += (ownerMixTarget - ownerMix) * lerpAlpha(0.05, dt);
+            }
+        }
+        // idle thinker: left hand docks under the chin in TWO stages — first wide
+        // of the skull (never travels through the face), then in under the jaw.
+        if (bones.head) {
+            bones.head.getWorldPosition(_V[2]);
+            bones.head.getWorldQuaternion(_dQ); // skull frame (rest ≈ identity, so local ≈ facing)
+            _dDir.set(0, -1, 0).applyQuaternion(_dQ); _V[2].addScaledVector(_dDir, skelH * 0.095); // well below the jaw
+            _dDir.set(0, 0, 1).applyQuaternion(_dQ);  _V[2].addScaledVector(_dDir, skelH * 0.068);  // tucked under
+            _dDir.set(1, 0, 0).applyQuaternion(_dQ);  _V[2].addScaledVector(_dDir, skelH * 0.02);   // hand's side
+            _V[6].copy(_V[2]); // staging point: same height, swung wide + ahead of the cheek
+            _dDir.set(1, 0, 0).applyQuaternion(_dQ);  _V[6].addScaledVector(_dDir, skelH * 0.085);
+            _dDir.set(0, 0, 1).applyQuaternion(_dQ);  _V[6].addScaledVector(_dDir, skelH * 0.03);
+        }
+        else { _V[2].copy(drive); _V[6].copy(drive); }
+        {
+            const e1 = sstep(idleAmt, 0, 0.55), e2 = sstep(idleAmt, 0.45, 1);
+            chinPt.copy(drive).lerp(_V[6], e1).lerp(_V[2], e2);
+        }
+        armOutL.minPush = 1 - idleAmt; armOutR.minPush = 1;
+        if (bones.humL && bones.ulnaL && bones.wristL) {
+            armOutL.wristBone = bones.wristL;
+            reachArm('humL', 'ulnaL', bones.humL, bones.ulnaL, bones.wristL, chinPt, armCenterX, armHalf, TUNE.armFollow, dt, armOutL);
+        }
+        if (bones.humR && bones.ulnaR && bones.wristR) {
+            armOutR.wristBone = bones.wristR;
+            reachArm('humR', 'ulnaR', bones.humR, bones.ulnaR, bones.wristR, drive, armCenterX, armHalf, TUNE.armFollow, dt, armOutR);
+        }
+        if (bones.ulnaL) { armOutL.wristBone = bones.wristL; reachForearm('ulnaL', bones.ulnaL, TUNE.handFollow, dt, armOutL); }
+        if (bones.ulnaR) { armOutR.wristBone = bones.wristR; reachForearm('ulnaR', bones.ulnaR, TUNE.handFollow, dt, armOutR); }
+
+        // — fixed standoff plane: seed from measured arm once, then track slowly —
+        {
+          const Lavg = ((armOutL.Ltot || 0) + (armOutR.Ltot || 0)) * 0.5;
+          if (Lavg > 0.01) {
+            const shZ = ((armOutL.shZ || 0) + (armOutR.shZ || 0)) * 0.5;
+            const target = shZ + Lavg * TUNE.standoff;
+            if (!planeSeeded) {
+              cursorPlaneZ = target;
+              _rawMouseTarget.z = target;
+              mouseWorld.z = target;
+              mousePlane.constant = -target;
+              planeSeeded = true;
+            } else {
+              cursorPlaneZ += (target - cursorPlaneZ) * lerpAlpha(0.05, dt);
+              mousePlane.constant = -cursorPlaneZ;
+              _rawMouseTarget.z = cursorPlaneZ; // keep raw on today's plane (x/y from events)
+            }
+          } else if (planeSeeded) {
+            _rawMouseTarget.z = cursorPlaneZ;
+          }
+        }
+
+        // — grab: distance closes the fist, velocity opens it —
+        // stopped cursor → full fist around it; flying cursor → fingers trail open.
+        if (!smoothInit) { _prevSmooth.copy(mouseWorld); smoothInit = true; }
+        {
+          const instV = mouseWorld.distanceTo(_prevSmooth) / Math.max(dt, 1e-3);
+          mouseVel += (instV - mouseVel) * lerpAlpha(0.08, dt);
+          _prevSmooth.copy(mouseWorld);
+        }
+        const velOpen = sstep(mouseVel, TUNE.velLo, TUNE.velHi) * TUNE.velAmt;
+        const gL = bones.wristL ? handGrab(bones.wristL, armOutL.Ltot || 1) : 0;
+        const gR = bones.wristR ? handGrab(bones.wristR, armOutR.Ltot || 1) : 0;
+        const wantL = clamp(gL * (1 - velOpen) * (1 - idleAmt * 0.75) + 0.75 * idleAmt, 0, 1); // chin hand folds into a tight fist
+        const wantR = clamp(gR * (1 - velOpen) * (1 - idleAmt * 0.75), 0, 1);
+        grabL += (wantL - grabL) * lerpAlpha(0.18, dt);
+        grabR += (wantR - grabR) * lerpAlpha(0.18, dt);
+
+        if (bones.wristL) applyWrist('wristL', bones.wristL, bones.carpL, drive, grabL, 0.14, dt);
+        if (bones.wristR) applyWrist('wristR', bones.wristR, bones.carpR, drive, grabR, 0.14, dt);
+        _V[4].copy(drive);
+        if (bones.head && bones.wristL && idleAmt > 0.001) {
+            // chin hand: knuckles aim down-forward off the wrist, so the tight fist
+            // hooks under the jaw instead of draping fingers up the cheek to the eye
+            bones.head.getWorldPosition(_V[7]);
+            bones.wristL.getWorldPosition(_V[3]);
+            _dDir.set(0, -1, 0).applyQuaternion(_dQ); _V[3].addScaledVector(_dDir, skelH * 0.04);
+            _dDir.set(0, 0, 1).applyQuaternion(_dQ);  _V[3].addScaledVector(_dDir, skelH * 0.07);
+            _V[4].copy(drive).lerp(_V[3], idleAmt);
+        }
+        if (bones.wristL) aimHand('wristL', bones.wristL, knuckleL(), _V[4], TUNE.handAimFollow * (1 - Math.sin(clamp(idleAmt, 0, 1) * Math.PI) * 0.7), TUNE.handAimMaxDeg, dt); // damped mid-transition: no aim snap
+        if (bones.wristR) aimHand('wristR', bones.wristR, knuckleR(), drive, TUNE.handAimFollow, TUNE.handAimMaxDeg, dt);
+        applyFingers(fingersL, grabL, dt);
+        applyFingers(fingersR, grabR, dt);
+
+        // — jaw drops when the cursor is close / hands are grabbing —
+        if (bones.mandible && restQuats.mandible) {
+            bones.mandible.getWorldPosition(_V[2]);
+            const _dxj = drive.x - _V[2].x, _dyj = drive.y - _V[2].y;
+            const chestD = Math.hypot(_dxj, _dyj); // xy only: standoff depth must not mute the jaw
+            const wantE = clamp(0.9 - chestD / 5, 0, 1) * 0.5 + Math.max(grabL, grabR) * 0.3;
+            excite += (wantE - excite) * lerpAlpha(0.10, dt);
+            _scratchEuler.set(excite * TUNE.jawOpen, 0, 0, 'XYZ'); // +X hinge: chin arcs down-BACK (was negated → jutting underbite)
+            _deltaQ.setFromEuler(_scratchEuler);
+            _targetQ.copy(restQuats.mandible).multiply(_deltaQ);
+            if (!currentQuats.mandible) currentQuats.mandible = restQuats.mandible.clone();
+            currentQuats.mandible.slerp(_targetQ, lerpAlpha(0.12, dt));
+            bones.mandible.quaternion.copy(currentQuats.mandible);
+        }
+    }
+
+        if (typeof updateDragon === 'function') updateDragon(dt, performance.now() * 0.001);
+        // intro flyby camera: shake + fov kick peak as the dragon whips past, then home
+        if (introT < 1) {
+            // wing-wind whisper: swells only for the crossing beat (~1 s), then gone
+            const su = clamp((introT - 0.1) / 0.25, 0, 1);
+            const amp = (introT > 0.1 && introT < 0.35 ? Math.sin(su * Math.PI) : 0) * 0.05;
+            const tC = performance.now() * 0.001;
+            shakeVec.set(Math.sin(tC * 61.3) * amp, Math.sin(tC * 53.7 + 1) * amp, 0);
+            camera.position.copy(camBase).add(shakeVec);
+        } else if (!camRestored) {
+            camera.position.copy(camBase); camRestored = true;
+        }
+    renderer.render(scene, camera);
+}
+animate();
+
+</script>
+
+
+<!-- ── GALLERIES + TRANSITIONS ── -->
+<script>
+(()=>{'use strict';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+
+/* ---- gallery media: photos + videos served from R2 ---- */
+const R2='https://pub-6738c828bef548d69b3f13bdd680b5b0.r2.dev/';
+const FILES=["5e049a0c4000d211319850.mp4","SHOWREEL.mp4","5d5bda1ebc256695282676.jpg","5d5bdf7abe822784192432.jpg","5d6e3bbddf54b151105755.jpg","5e399d82f3290657407083.jpg","5ee8db72af80f909524534.jpg","601912a92eb74241213716.jpg","6053476e136d7304731821.jpg","628cf7aba738c720385583.jpg","62c56430515d3949380759.jpg","62c75b552bd15329776065.jpg","62c7640fac471714846201.jpg","62c7714d7d2e1325581468.jpg","62cc9fdfe522c711753526.jpg","636550d9790e8238106509.jpg","63f2c7a44c88b976587355.png","642c5dd504398005082720.jpg","65d1a42a869eb227750444.jpg","65e92a128a256796330440.jpg","65e92a1297bf3032768098.jpg","67cb08345d4d2963180850.jpg","67cb0a92895d4039278132.jpg","6808b53bb7068987409.png","6856332b9686a14091301.jpg","6856f95f9d9a1d41715599.png","685ec8b36860b001268254.png","685ed6113d7e1188021993.png","686091b69d53a156849973.jpg","68667f412da31917052357.jpg","68753a223515a578350963.png","6878ecb65f6e4506636696.jpg","68800177b0f13324204353.png","6880c766bb2af2.02323556.jpg","6880ece6219cb262822858.jpg","6881a41218e24628259487.jpg","68820218411f4245538872.jpg","6882607a432e0314981344.jpg","688260f470c90519915243.jpg","6882714bca49b082053794.jpg","AlSelect_20250909_233132_Chrome.png","AlSelect_20251216_182512_Chrome.png","AlSelect_20251216_182548_Chrome.png","AlSelect_20251216_182644_Chrome.png","AlSelect_20260105_164230_Chrome.png","AlSelect_20260105_164325_Chrome.png","AlSelect_20260105_164452_Chrome.png","AlSelect_20260106_221122_Firefox.png","AlSelect_20260106_221132_Firefox.png"];
+const NAMES=FILES.map(f=>f.replace(/\.[a-z0-9]+$/i,'').replace(/_/g,' '));
+const YEARS=FILES.map(()=>'');
+const SRC=FILES.map(f=>R2+f);
+const ISVID=FILES.map(f=>/\.mp4$/i.test(f));
+function sourceIdx(i){const n=SRC.length;let s=Math.max(2,Math.round(n*.618));while(gcd(s,n)!==1)s++;return (i*s)%n}
+function mediaEl(k){
+  if(ISVID[k]){
+    const v=document.createElement('video');
+    v.src=SRC[k];v.muted=true;v.loop=true;v.playsInline=true;v.autoplay=true;v.preload='metadata';
+    v.setAttribute('muted','');v.setAttribute('playsinline','');v.disablePictureInPicture=true;
+    v.play().catch(()=>{});
+    return v;
+  }
+  const m=document.createElement('img');m.src=SRC[k];m.alt='';m.draggable=false;
+  m.onerror=()=>{const n=+(m.dataset.n||0)+1;m.dataset.n=n;if(n>SRC.length)return;let j=(k+n)%SRC.length,g=0;while(ISVID[j]&&g++<SRC.length)j=(j+1)%SRC.length;m.src=SRC[j];};
+  return m;
+}
+function card(cls,i){const e=document.createElement('div');e.className=cls;const k=sourceIdx(i);e.appendChild(mediaEl(k));e.dataset.k=k;return e}
+
+/* ---- scene registry: index 0 = hero, 4 = outro, 1-3 = galleries ---- */
+const SCN=['hero','wheel','sphere','path','outro'],scenes={};
+let vis=[0],last=performance.now();
+function drawFX(){
+  if(B<0)return;
+  const k=A+'/'+B+'/'+sU.toFixed(4);
+  if(k===drawKey)return;drawKey=k;
+  glfx.forEach(g=>g.c.classList.remove('on'));px.classList.remove('on');
+  FXS[A](sU);
+}
+function loop(now){
+  const dt=Math.min((now-last)/1000,.1);last=now;
+  if(B>=0&&sU!==tU){sU+=(tU-sU)*(1-Math.exp(-dt*7));if(Math.abs(tU-sU)<1e-4)sU=tU;drawFX()}
+  for(const i of vis){const s=scenes[SCN[i]];if(s)s.frame(dt,now)}
+  requestAnimationFrame(loop);
+}
+const ramp=ms=>{let t0;return()=>{t0??=performance.now();const t=clamp((performance.now()-t0)/ms,0,1);return 1-Math.pow(1-t,3)}};
+
+/* ================= WHEEL ================= */
+scenes.wheel=(()=>{
+  const C={size:1.52,count:93,rv:.315,tilt:-16.5,yaw:90,lean:1,persp:600,cw:74,asp:.625,
+    scroll:.06,drag:.02,ease:.02,idle:.02,drive:.05,nearLimit:.8,introMs:1800,introFrom:.02,introTurn:90,tiltClamp:10};
+  const sc=document.getElementById('s-wheel'),vp=document.getElementById('wv'),st=document.getElementById('ws');
+  const items=[];let radius,cw,ch;
+  function measure(){
+    const fit=Math.min(innerWidth,innerHeight),P=C.persp*C.size;
+    radius=Math.min(clamp(fit*C.rv,120,900)*C.size,P*C.nearLimit);
+    cw=C.cw*C.size;ch=cw*C.asp;vp.style.perspective=P.toFixed(1)+'px';
+  }
+  function layout(){
+    const step=360/C.count;
+    items.forEach((el,i)=>{
+      el.style.width=cw+'px';el.style.height=ch+'px';
+      el.style.transform=`rotateY(${(i*step).toFixed(3)}deg) translateZ(${radius.toFixed(2)}px) rotateY(${C.yaw}deg) rotateX(${C.lean}deg) translate(-50%,-50%)`;
+    });
+  }
+  for(let i=0;i<C.count;i++){const e=card('card',i);st.appendChild(e);items.push(e)}
+  measure();layout();
+  let spin=0,pend=0,dragging=false,pid=null,lx=0,lmx=null;
+  const intro=ramp(C.introMs);let ik=0,ip=0;
+  sc.addEventListener('pointerdown',e=>{dragging=true;pid=e.pointerId;lx=e.clientX;sc.classList.add('drag');sc.setPointerCapture(pid)});
+  sc.addEventListener('pointermove',e=>{
+    if(dragging&&e.pointerId===pid){pend+=(e.clientX-lx)*C.drag;lx=e.clientX}
+    else if(lmx!==null)pend+=(e.clientX-lmx)*C.drive;
+    lmx=e.clientX;
+  });
+  sc.addEventListener('pointerleave',()=>lmx=null);
+  const end=()=>{dragging=false;sc.classList.remove('drag')};
+  sc.addEventListener('pointerup',end);sc.addEventListener('pointercancel',end);
+  const pf=document.getElementById('pf'),pn=document.getElementById('pn'),py=document.getElementById('py');
+  let activeCard=null,shown=-1,tick=0;
+  function pick(){
+    const vr=vp.getBoundingClientRect(),tx=vr.left+vr.width*.78,ty=vr.top+vr.height*.5;
+    let best=null,bs=1e9;
+    for(const c of items){
+      const r=c.getBoundingClientRect();if(r.width<12)continue;
+      const s=Math.hypot(r.left+r.width/2-tx,r.top+r.height/2-ty)-r.width*1.6;
+      if(s<bs){bs=s;best=c}
+    }
+    return best;
+  }
+  function show(k){
+    if(k===shown)return;shown=k;
+    const l=document.createElement('div');l.className='pl';
+    l.appendChild(mediaEl(k));pf.appendChild(l);
+    while(pf.children.length>3)pf.removeChild(pf.firstChild);
+    l.addEventListener('animationend',()=>{while(pf.firstChild!==l)pf.removeChild(pf.firstChild)},{once:true});
+    pn.textContent=String(+k+1).padStart(2,'0')+' · '+NAMES[k];py.textContent=YEARS[k];
+  }
+  addEventListener('resize',()=>{measure();layout()});
+  return{push(d){pend+=d*C.scroll},resize(){measure();layout()},frame(){
+    ik=intro();const dk=Math.max(0,ik-ip);ip=ik;
+    if(!dragging)pend+=C.idle;
+    if(!dragging)spin+=C.introTurn*dk;
+    const s=pend*C.ease;pend-=s;spin+=s;
+    const k=C.introFrom+(1-C.introFrom)*ik;
+    st.style.transform=`scale3d(${k},${k},${k}) rotateX(${C.tilt}deg) rotateY(${spin.toFixed(3)}deg)`;
+    if(++tick%3===0){
+      const n=pick();
+      if(n&&n!==activeCard){activeCard=n;show(+n.dataset.k)}
+    }
+  }};
+})();
+
+/* ================= SPHERE ================= */
+scenes.sphere=(()=>{
+  const C={count:65,maxR:430,minR:150,rv:.43,spacing:.29,asp:1.28,fit:1.05,persp:1400,drag:.07,ease:.25,idle:.075,zoomStep:3,zoomMin:-360,maxNear:13.5,zoomEase:.17,introMs:1800,introFrom:.02,introTurn:140};
+  const sc=document.getElementById('s-sphere'),vp=document.getElementById('sv'),st=document.getElementById('ss');
+  vp.style.perspective=C.persp+'px';
+  const D=Math.PI/180,GA=Math.PI*(3-Math.sqrt(5));
+  const mMul=(a,b)=>{const o=[];for(let r=0;r<3;r++)for(let c=0;c<3;c++)o[r*3+c]=a[r*3]*b[c]+a[r*3+1]*b[3+c]+a[r*3+2]*b[6+c];return o};
+  const rx=a=>{const s=Math.sin(a),c=Math.cos(a);return[1,0,0,0,c,-s,0,s,c]};
+  const ry=a=>{const s=Math.sin(a),c=Math.cos(a);return[c,0,s,0,1,0,-s,0,c]};
+  function ortho(m){
+    let x=[m[0],m[3],m[6]],y=[m[1],m[4],m[7]];
+    const nx=Math.hypot(...x);x=x.map(v=>v/nx);
+    const d=x[0]*y[0]+x[1]*y[1]+x[2]*y[2];y=[y[0]-d*x[0],y[1]-d*x[1],y[2]-d*x[2]];
+    const ny=Math.hypot(...y);y=y.map(v=>v/ny);
+    const z=[x[1]*y[2]-x[2]*y[1],x[2]*y[0]-x[0]*y[2],x[0]*y[1]-x[1]*y[0]];
+    return[x[0],y[0],z[0],x[1],y[1],z[1],x[2],y[2],z[2]];
+  }
+  const items=[],pos=[];let radius,restZoom,zoomMaxRel,iw,ih;
+  function measure(){
+    const fit=Math.min(innerWidth,innerHeight);
+    radius=clamp(fit*C.rv,C.minR,C.maxR);
+    const spacing=radius*Math.sqrt(4*Math.PI/C.count);
+    iw=spacing*C.spacing/Math.hypot(1,C.asp);ih=iw*C.asp;
+    const P=C.persp;
+    restZoom=P-2*radius*P/(C.fit*fit);
+    zoomMaxRel=(P-P/C.maxNear-radius)-restZoom;
+  }
+  function layout(){
+    pos.length=0;
+    for(let i=0;i<C.count;i++){
+      const yy=1-(2*i+1)/C.count,lat=Math.asin(clamp(yy,-1,1)),lon=i*GA;
+      pos.push([radius*Math.cos(lat)*Math.sin(lon),-radius*Math.sin(lat),radius*Math.cos(lat)*Math.cos(lon)]);
+      items[i].style.width=iw+'px';items[i].style.height=ih+'px';
+    }
+  }
+  for(let i=0;i<C.count;i++){const e=card('card',i);st.appendChild(e);items.push(e)}
+  measure();layout();
+  let rot=mMul(rx(-6*D),[1,0,0,0,1,0,0,0,1]),px=0,py=0,zoom=restZoom,tz=restZoom,dragging=false,pid=null,lx=0,ly=0,fc=0;
+  const intro=ramp(C.introMs);let ik=0,ip=0;
+  sc.addEventListener('pointerdown',e=>{dragging=true;pid=e.pointerId;lx=e.clientX;ly=e.clientY;sc.classList.add('drag');sc.setPointerCapture(pid)});
+  sc.addEventListener('pointermove',e=>{
+    if(!dragging||e.pointerId!==pid)return;
+    py+=(e.clientX-lx)*C.drag;px-=(e.clientY-ly)*C.drag;lx=e.clientX;ly=e.clientY;
+  });
+  const end=()=>{dragging=false;sc.classList.remove('drag')};
+  sc.addEventListener('pointerup',end);sc.addEventListener('pointercancel',end);
+  let pd=0,pz=0;
+  sc.addEventListener('touchstart',e=>{if(e.touches.length!==2)return;const[a,b]=e.touches;pd=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);pz=tz},{passive:true});
+  sc.addEventListener('touchmove',e=>{if(e.touches.length!==2||!pd)return;e.preventDefault();const[a,b]=e.touches;
+    tz=clamp(pz+(Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)-pd)*2.2,restZoom+C.zoomMin,restZoom+zoomMaxRel)},{passive:false});
+  sc.addEventListener('touchend',()=>pd=0,{passive:true});
+  addEventListener('resize',()=>{const o=tz-restZoom;measure();layout();tz=clamp(restZoom+o,restZoom+C.zoomMin,restZoom+zoomMaxRel)});
+  return{push(d){py+=d*.06},resize(){measure();layout()},frame(){
+    ik=intro();const dk=Math.max(0,ik-ip);ip=ik;
+    if(!dragging)py+=C.idle+C.introTurn*dk;
+    const ax=px*C.ease,ay=py*C.ease;
+    if(ax||ay){px-=ax;py-=ay;rot=mMul(mMul(ry(ay*D),rx(ax*D)),rot);if((++fc&63)===0)rot=ortho(rot)}
+    zoom+=(tz-zoom)*C.zoomEase;
+    const R=rot,k=C.introFrom+(1-C.introFrom)*ik;
+    st.style.transform=`scale3d(${k},${k},${k}) matrix3d(${R[0]},${R[3]},${R[6]},0,${R[1]},${R[4]},${R[7]},0,${R[2]},${R[5]},${R[8]},0,0,0,${zoom},1)`;
+    const inv=`matrix3d(${R[0]},${R[1]},${R[2]},0,${R[3]},${R[4]},${R[5]},0,${R[6]},${R[7]},${R[8]},0,0,0,0,1)`;
+    for(let i=0;i<items.length;i++){
+      const p=pos[i];
+      const wx=R[0]*p[0]+R[1]*p[1]+R[2]*p[2],wy=R[3]*p[0]+R[4]*p[1]+R[5]*p[2],az=Math.abs(R[6]*p[0]+R[7]*p[1]+R[8]*p[2]);
+      items[i].style.transform=`translate3d(${p[0].toFixed(2)}px,${p[1].toFixed(2)}px,${p[2].toFixed(2)}px) ${inv} rotateY(${(Math.atan2(wx,az)/D).toFixed(2)}deg) rotateX(${(Math.atan2(-wy,Math.hypot(wx,az))/D).toFixed(2)}deg) translate(-50%,-50%)`;
+    }
+  }};
+})();
+
+/* ================= PATH GALLERY + MINIMAP ================= */
+scenes.path=(()=>{
+  const C={knots:18,scale:3,lookAhead:.08,rubber:.35,wheel:.00009,drift:.012,count:200,
+    scMin:960,scX:1425,scY:1425,scZ:1200,seed:57,size:280,nearClip:100,
+    mouseGain:8,mouseX:90,mouseY:55,mouseTurn:.35,mouseEase:.28,
+    fogNear:2600,fogFar:5000,greyAt:900,greyGone:5200,greyPow:1.2,
+    radius:0,radiusMove:50,radiusAt:240,radiusFall:.35};
+  const sc=document.getElementById('s-path'),world=document.getElementById('world');
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k];
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const len=a=>Math.hypot(a[0],a[1],a[2])||1e-6,norm=a=>mul(a,1/len(a));
+  const PTS=Array.from({length:C.knots},(_,i)=>{const a=i/C.knots*Math.PI*2;
+    return[(Math.sin(a)+2*Math.sin(2*a))*900,(Math.cos(a)-2*Math.cos(2*a))*900,-Math.sin(3*a)*900]});
+  function curveAt(t){
+    const n=PTS.length,f=((t%1)+1)%1*n,i=Math.floor(f),u=f-i;
+    const p0=PTS[(i-1+n)%n],p1=PTS[i%n],p2=PTS[(i+1)%n],p3=PTS[(i+2)%n],u2=u*u,u3=u2*u,o=[0,0,0];
+    for(let k=0;k<3;k++)o[k]=C.scale*.5*(2*p1[k]+(-p0[k]+p2[k])*u+(2*p0[k]-5*p1[k]+4*p2[k]-p3[k])*u2+(-p0[k]+3*p1[k]-3*p2[k]+p3[k])*u3);
+    return o;
+  }
+  const tangentAt=t=>norm(sub(curveAt(t+.001),curveAt(t-.001)));
+  function frameAt(t){
+    const f=tangentAt(t);let s=cross(f,[0,-1,0]);if(len(s)<.02)s=cross(f,[1,0,0]);
+    s=norm(s);return{f,s,u:norm(cross(s,f))};
+  }
+  const rnd=(i,k)=>{const x=Math.sin(i*127.1+k*311.7+C.seed*74.7)*43758.5453;return x-Math.floor(x)};
+  const items=[];
+  for(let i=0;i<C.count;i++){
+    const el=card('it',i),t=i/C.count,fr=frameAt(t);
+    let ox=(rnd(i,1)-.5)*2*C.scX,oy=(rnd(i,2)-.5)*2*C.scY;
+    const r=Math.hypot(ox,oy)||1e-6;if(r<C.scMin){ox*=C.scMin/r;oy*=C.scMin/r}
+    const oz=(rnd(i,3)-.5)*2*C.scZ,w=C.size,h=Math.round(w/1.4);
+    el.style.cssText+=`width:${w}px;height:${h}px;margin:${-h/2}px 0 0 ${-w/2}px;`;
+    el.style.borderRadius='var(--r,0%)';
+    world.appendChild(el);
+    items.push({el,w,h,off:false,g:-1,p:add(add(curveAt(t),mul(fr.s,ox)),add(mul(fr.u,oy),mul(fr.f,oz)))});
+  }
+  let target=0,cur=0,kick=0,lastR=-1,wantX=0,wantY=0,gotX=0,gotY=0;
+  addEventListener('pointermove',e=>{wantX=(e.clientX/innerWidth-.5)*2;wantY=(e.clientY/innerHeight-.5)*2});
+  document.addEventListener('pointerleave',()=>{wantX=0;wantY=0});
+  let tdrag=null;
+  sc.addEventListener('pointerdown',e=>{tdrag=e.clientY});
+  sc.addEventListener('pointermove',e=>{if(tdrag!==null){target-=(e.clientY-tdrag)*C.wheel*3;tdrag=e.clientY}});
+  addEventListener('pointerup',()=>tdrag=null);
+
+  const host=document.getElementById('map'),cv=host.querySelector('canvas'),cx=cv.getContext('2d');
+  let mw=184,mh=265,mp=null;
+  function mapMeasure(){
+    const d=Math.min(devicePixelRatio||1,2);cv.width=mw*d;cv.height=mh*d;cx.setTransform(d,0,0,d,0,0);
+    const N=420,raw=[];let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(let i=0;i<N;i++){const p=curveAt(i/N),x=p[0],y=p[2]-p[1]*.25;raw.push([x,y]);x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
+    const k=Math.min(mw/(x1-x0),mh/(y1-y0))*.74;
+    mp=raw.map(([x,y])=>[mw/2+(x-(x0+x1)/2)*k,mh/2+(y-(y0+y1)/2)*k]);
+  }
+  mapMeasure();
+  const lapGap=(a,b)=>{const d=Math.abs(((a-b)%1+1)%1);return Math.min(d,1-d)};
+  function drawMap(){
+    const at=((cur%1)+1)%1,N=mp.length;
+    cx.clearRect(0,0,mw,mh);cx.lineCap='round';cx.strokeStyle='#000';
+    for(let i=0;i<N;i++){
+      const a=mp[i],b=mp[(i+1)%N],near=1-Math.min(1,lapGap((i+.5)/N,at)/.12),lit=Math.pow(near,2.2);
+      cx.globalAlpha=.05+.95*lit;cx.lineWidth=1.2+2.2*lit;
+      cx.beginPath();cx.moveTo(a[0],a[1]);cx.lineTo(b[0],b[1]);cx.stroke();
+    }
+    const f=at*N,i0=Math.floor(f)%N,u=f-Math.floor(f),p0=mp[i0],p1=mp[(i0+1)%N];
+    const x=p0[0]+(p1[0]-p0[0])*u,y=p0[1]+(p1[1]-p0[1])*u;
+    cx.globalAlpha=1;cx.fillStyle='#fff';cx.beginPath();cx.arc(x,y,4,0,7);cx.fill();
+    const dx=p1[0]-p0[0],dy=p1[1]-p0[1],m=Math.hypot(dx,dy)||1;
+    cx.lineWidth=1.2;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+dx/m*7,y+dy/m*7);cx.stroke();
+    cx.fillStyle='#000';cx.fillRect(Math.round(x-1.5),Math.round(y-1.5),3,3);
+  }
+
+  return{push(d){target+=d*C.wheel;kick=Math.min(1,kick+Math.abs(d)/C.radiusAt)},resize(){},frame(dt){
+    gotX+=(wantX-gotX)*(1-Math.exp(-dt/C.mouseEase));gotY+=(wantY-gotY)*(1-Math.exp(-dt/C.mouseEase));
+    target+=C.drift*dt;cur+=(target-cur)*(1-Math.exp(-dt/C.rubber));
+    kick*=Math.exp(-dt/C.radiusFall);if(kick<.001)kick=0;
+    const wr=C.radius+(C.radiusMove-C.radius)*kick;
+    if(Math.abs(wr-lastR)>.1){lastR=wr;world.style.setProperty('--r',wr.toFixed(2)+'%')}
+    const eye0=curveAt(cur),aim0=curveAt(cur+C.lookAhead),f0=norm(sub(aim0,eye0));
+    let up=[0,-1,0],s=cross(f0,up);if(len(s)<.02)s=cross(f0,[1,0,0]);s=norm(s);up=norm(cross(s,f0));
+    const nudge=add(mul(s,gotX*C.mouseX*C.mouseGain),mul(up,gotY*C.mouseY*C.mouseGain));
+    const eye=add(eye0,nudge),aim=add(aim0,mul(nudge,1-C.mouseTurn)),f=norm(sub(aim,eye));
+    s=cross(f,[0,-1,0]);if(len(s)<.02)s=cross(f,[1,0,0]);s=norm(s);up=norm(cross(s,f));
+    const m=[s[0],up[0],-f[0],0,s[1],up[1],-f[1],0,s[2],up[2],-f[2],0,-dot(s,eye),-dot(up,eye),dot(f,eye),1];
+    world.style.transform='matrix3d('+m.map(v=>v.toFixed(5)).join(',')+')';
+    const rot='matrix3d('+[s[0],s[1],s[2],0,up[0],up[1],up[2],0,-f[0],-f[1],-f[2],0,0,0,0,1].map(v=>v.toFixed(4)).join(',')+')';
+    for(const it of items){
+      const rel=sub(it.p,eye),ahead=dot(rel,f),d=len(rel);
+      if(ahead<C.nearClip+Math.max(it.w,it.h)*.5||d>C.fogFar){
+        if(!it.off){it.off=true;it.el.style.visibility='hidden'}continue;
+      }
+      if(it.off){it.off=false;it.el.style.visibility=''}
+      it.el.style.opacity=(1-clamp((d-C.fogNear)/(C.fogFar-C.fogNear),0,1)).toFixed(3);
+      const gk=clamp((d-C.greyAt)/(C.greyGone-C.greyAt),0,1),g=Math.round(Math.pow(gk,C.greyPow)*50)/50;
+      if(g!==it.g){it.g=g;it.el.style.filter=`grayscale(${g})`}
+      it.el.style.transform=`translate3d(${it.p[0].toFixed(1)}px,${it.p[1].toFixed(1)}px,${it.p[2].toFixed(1)}px) ${rot}`;
+    }
+    drawMap();
+  }};
+})();
+
+/* ================= transitions =================
+   Every transition is a pure function of its progress, so it plays
+   backwards when the user scrolls back up. One per seam:
+   hero→wheel liquid · wheel→sphere iris · sphere→path sheet · path→outro pixel */
+const $=id=>document.getElementById(id),dark=matchMedia('(prefers-color-scheme:dark)');
+const stage=$('stage'),pages=[...document.querySelectorAll('.scene')],px=$('px');
+const heroImage=document.querySelector('.hero-image'),stepEl=$('step'),rail=$('rail');
+const dpr=()=>Math.min(devicePixelRatio||1,2);
+const hex=h=>{const n=parseInt(h.slice(1),16);return[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255]};
+const VERT='attribute vec2 aPos;varying vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
+const NOISE=`float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
+float fbm(vec2 p,int oct){float v=0.,a=.5;for(int i=0;i<6;i++){if(i>=oct)break;v+=a*vnoise(p);p*=2.03;a*=.5;}return v;}`;
+const glfx=[];
+function GL(frag,premult,scale){
+  const c=document.createElement('canvas');c.className='fx';c.setAttribute('aria-hidden','true');stage.insertBefore(c,px);
+  const gl=c.getContext('webgl',{alpha:true,premultipliedAlpha:premult,antialias:false});
+  if(!gl)return null;
+  const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(o));return o};
+  const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VERT));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,frag));
+  gl.bindAttribLocation(p,0,'aPos');gl.linkProgram(p);gl.useProgram(p);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  if(!premult){gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA)}
+  const locs={},o={c,gl,
+    resize(){const d=dpr()*scale,w=Math.max(2,Math.round(stage.clientWidth*d)),h=Math.max(2,Math.round(stage.clientHeight*d));c.width=w;c.height=h;gl.viewport(0,0,w,h)},
+    draw(u){
+      for(const k in u){const v=u[k],l=locs[k]||(locs[k]=gl.getUniformLocation(p,k));if(l==null)continue;
+        if(typeof v==='number')(k==='uDetail'?gl.uniform1i:gl.uniform1f).call(gl,l,v);
+        else if(v.length===2)gl.uniform2fv(l,v);else gl.uniform3fv(l,v)}
+      gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,3)}};
+  o.resize();glfx.push(o);return o;
+}
+const clock=()=>performance.now()/1000%1000;
+const IRIS_FRAG=`precision highp float;varying vec2 vUv;
+uniform vec2 uRes;uniform float uT,uTime,uPixel,uNoiseScale,uNoiseAmp,uNoiseSpeed,uSteep,uClose,uOpen,uGlowWidth,uGlowGain,uDark,uBright,uPulse;uniform vec3 uBorder,uGround;
+vec3 hash3(vec3 p){p=vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6)));return -1.+2.*fract(sin(p)*43758.5453123);}
+float pnoise(vec3 p){vec3 i=floor(p),f=fract(p);vec3 u=f*f*f*(f*(f*6.-15.)+10.);
+return mix(mix(mix(dot(hash3(i+vec3(0,0,0)),f-vec3(0,0,0)),dot(hash3(i+vec3(1,0,0)),f-vec3(1,0,0)),u.x),mix(dot(hash3(i+vec3(0,1,0)),f-vec3(0,1,0)),dot(hash3(i+vec3(1,1,0)),f-vec3(1,1,0)),u.x),u.y),
+mix(mix(dot(hash3(i+vec3(0,0,1)),f-vec3(0,0,1)),dot(hash3(i+vec3(1,0,1)),f-vec3(1,0,1)),u.x),mix(dot(hash3(i+vec3(0,1,1)),f-vec3(0,1,1)),dot(hash3(i+vec3(1,1,1)),f-vec3(1,1,1)),u.x),u.y),u.z);}
+void main(){
+ vec2 px=max(vec2(uPixel),vec2(1.));vec2 frag=floor(gl_FragCoord.xy/px)*px+px*.5;vec2 uv=frag/uRes;
+ vec2 c=(uv-.5)*vec2(uRes.x/max(uRes.y,1.),1.);
+ float n=pnoise(vec3(c*uNoiseScale,uTime*uNoiseSpeed));c+=n*uNoiseAmp*.25;
+ float maxD=length(vec2(uRes.x/max(uRes.y,1.),1.)*.5);float d=length(c)/max(maxD,1e-4);
+ float g=d*uSteep+(1.-uT)*uClose-uOpen*uT;
+ float mass=smoothstep(0.,1.,g);
+ float edge=smoothstep(uGlowWidth,0.,abs(g))*clamp(uT*uGlowGain,0.,1.);
+ float pulse=1.+(uPulse>0.?sin(uTime*uPulse)*.35:0.);
+ vec3 rim=uBorder*uBright*pulse;vec3 body=mix(uGround,uBorder*uDark,.5);
+ vec3 rgb=mix(body,rim,clamp(edge,0.,1.));float a=clamp(max(mass,edge),0.,1.);
+ if(a<=.002){gl_FragColor=vec4(0.);return;}gl_FragColor=vec4(rgb,a);}`;
+const LIQ_FRAG=`precision highp float;varying vec2 vUv;
+uniform float uP,uTime,uAspect,uOvershoot,uBasin,uWaveAmp,uWaveFreq,uWaveSpeed,uSurfNoise,uSurfScale,uSurfSpeed,uEdgeScale,uEdgeAmp,uEdgeSoft,uEdgeDrift,uTexScale,uTexContrast,uTexGrit,uTexLift,uTexGamma,uCrestWidth,uCrestGain,uGrain;uniform vec3 uDark,uLight,uCrest;
+${NOISE}
+float surface(float x){float base=-.25+uP*(uOvershoot+.25);float b=uBasin*pow(abs(x-.5)*2.,2.);
+ float w=sin(x*6.2831853*uWaveFreq+uTime*uWaveSpeed)*uWaveAmp+sin(x*6.2831853*uWaveFreq*1.93-uTime*uWaveSpeed*.7)*uWaveAmp*.55;
+ float n=(fbm(vec2(x*uSurfScale,uTime*uSurfSpeed),3)-.5)*2.*uSurfNoise;return base+b+w+n;}
+void main(){vec2 uv=vUv;float d=surface(uv.x)-uv.y;
+ vec2 np=vec2(uv.x*uAspect,uv.y)*uEdgeScale;float n=fbm(np+vec2(0.,uTime*uEdgeDrift),4)-.5;
+ float dn=d+n*uEdgeAmp*2.;float m=smoothstep(-uEdgeSoft,uEdgeSoft,dn);if(m<=.001){gl_FragColor=vec4(0.);return;}
+ vec2 tp=vec2(uv.x*uAspect,uv.y);float t=fbm(tp*uTexScale,5);
+ float grit=fbm(tp*uTexScale*5.,3)*.68+vnoise(tp*uTexScale*21.)*.32;t=mix(t,grit,uTexGrit);
+ t=clamp((t-.5)*uTexContrast+.5+uTexLift,0.,1.);t=pow(t,uTexGamma);vec3 col=mix(uDark,uLight,t);
+ float crest=(1.-smoothstep(0.,max(uCrestWidth,1e-4),dn))*step(-uEdgeSoft,dn);col=mix(col,uCrest,clamp(crest*uCrestGain,0.,1.));
+ col+=(hash(gl_FragCoord.xy+uTime)-.5)*uGrain;gl_FragColor=vec4(clamp(col,0.,1.),m);}`;
+const LIQ={uOvershoot:1.35,uBasin:.3,uWaveAmp:.055,uWaveFreq:1.15,uWaveSpeed:.55,uSurfNoise:.07,uSurfScale:2.4,uSurfSpeed:.35,uEdgeScale:7,uEdgeAmp:.09,uEdgeSoft:.004,uEdgeDrift:.25,uTexScale:10,uTexContrast:3,uTexGrit:.65,uTexLift:.01,uTexGamma:1.2,uCrestWidth:.02,uCrestGain:1,uGrain:.03,uDark:hex('#423C36'),uLight:hex('#EFECE9'),uCrest:hex('#D5D3D3')};
+const SHEET_FRAG=`precision highp float;varying vec2 vUv;
+uniform float uP,uTime,uAspect,uFlip,uOut,uDispAmp,uDispScale,uDispDrift,uSoft,uLens,uAxis;uniform int uDetail;uniform vec3 uTop,uFoot;
+${NOISE}
+float noiseAt(vec2 uv){vec2 q=(uAxis>.5)?vec2(uv.y,uv.x):uv;float y=mix(q.y,1.-q.y,uFlip);return fbm(vec2(q.x*uAspect,y)*uDispScale+vec2(0.,uTime*uDispDrift),uDetail)-.5;}
+float axisY(vec2 uv){vec2 q=(uAxis>.5)?vec2(uv.y,uv.x):uv;return mix(q.y,1.-q.y,uFlip);}
+float field(vec2 uv){float e=mix(-uDispAmp,1.+uDispAmp,uP);return(e-axisY(uv))+noiseAt(uv)*uDispAmp*2.;}
+void main(){
+ vec2 uv=vUv;if(uLens!=0.){vec2 d=vUv-.5;uv=.5+d*(1.+uLens*dot(d,d)*4.);uv=clamp(uv,0.,1.);}
+ float a=smoothstep(-uSoft,uSoft,field(uv));a=max(a,smoothstep(.985,1.,uP));a=mix(a,1.-a,uOut);
+ if(a<=.001)discard;vec3 col=mix(uFoot,uTop,clamp(vUv.y,0.,1.));gl_FragColor=vec4(col*a,a);}`;
+const inOutQuad=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const liqEase=t=>{t=clamp(t,0,1);return 1-Math.pow(1-Math.pow(t,1.74),3.92)};
+const maskEase=(k,dur,tau)=>{const n=Math.max(1,dur)/tau;return(1-Math.exp(-k*n))/(1-Math.exp(-n))};
+let iris,liquid,sheet;
+try{iris=GL(IRIS_FRAG,false,1);liquid=GL(LIQ_FRAG,false,.85);sheet=GL(SHEET_FRAG,true,1)}catch(e){console.warn('WebGL transition failed:',e.message)}
+
+/* pixel wipe is DOM: stepped clip-path plus per-tile flicker */
+const COLS=12,P_DUR=1,P_FADE=.2,P_OVER=.3;let pxItems=[],pxKey='';
+function buildPx(){
+  const w=stage.clientWidth,h=stage.clientHeight,key=w+'x'+h;if(key===pxKey)return;pxKey=key;
+  const size=w/COLS,rows=Math.ceil(h/size);px.replaceChildren();pxItems=[];
+  const cs=Math.min(P_FADE,P_DUR*.5),step=Math.max(.001,P_DUR-2*cs)/COLS;
+  for(let i=0;i<COLS;i++){
+    const col=document.createElement('div'),rev=cs+i*step,fs=Math.max(0,rev-P_FADE),fo=Math.min(P_DUR,rev+step);
+    const pd=Math.max(.001,P_FADE/rows*(1-P_OVER)+P_FADE*P_OVER),spread=Math.max(0,P_FADE-pd);
+    for(let r=0;r<rows;r++){const e=document.createElement('i');e.style.height=size+'px';col.appendChild(e);pxItems.push({e,a:fs+Math.random()*spread,b:fo+Math.random()*spread,pd})}
+    px.appendChild(col);
+  }
+}
+
+/* A = scene leaving, B = scene arriving. Cover with A showing, swap, clear onto B. */
+let A=0,B=-1,prevVis=[0],tU=0,sU=0,drawKey='',lastPair='',vidCache=null;
+function show(...v){
+  if(v.includes(0)&&!prevVis.includes(0)){
+    heroImage.style.animation='none';void heroImage.offsetWidth;heroImage.style.animation='';
+  }
+  prevVis=v;vis=v;
+  pages.forEach((p,i)=>{p.classList.toggle('on',v.includes(i));p.style.clipPath='';p.style.zIndex=''});
+  if(!vidCache)vidCache=pages.map(p=>[...p.querySelectorAll('video')]);
+  pages.forEach((p,i)=>{const on=v.includes(i);for(const vd of vidCache[i]){if(on){if(vd.paused)vd.play().catch(()=>{})}else if(!vd.paused)vd.pause()}});
+}
+function gl2(o,u,s,make){const ph=u>=s?1:0,k=ph?(u-s)/(1-s):u/s;show(ph?B:A);if(!o)return;o.c.classList.add('on');o.draw(make(ph,k))}
+const FX={
+  liquid(u){gl2(liquid,u,900/1600,(ph,k)=>Object.assign({uP:ph?1-liqEase(k):liqEase(k),uTime:clock(),uAspect:liquid.c.width/liquid.c.height},LIQ))},
+  iris(u){gl2(iris,u,850/1350,(ph,k)=>{const T=ph?inOutQuad(k):1-inOutQuad(k);
+    return{uRes:[iris.c.width,iris.c.height],uT:T,uTime:clock(),uPixel:Math.max(1,dpr()),uNoiseScale:2.2,uNoiseAmp:.9,uNoiseSpeed:0,uSteep:12.5,uClose:2,uOpen:15,uGlowWidth:1,uGlowGain:5,uDark:.015,uBright:2.35,uPulse:0,uBorder:hex('#2E6BFF'),uGround:hex(dark.matches?'#000000':'#ffffff')}})},
+  sheet(u){gl2(sheet,u,1404/3823,(ph,k)=>{const w=sheet.c.width,h=sheet.c.height,dk=dark.matches;
+    return{uP:ph?.36+.64*maskEase(k,2419,500):maskEase(k,1404,500),uOut:ph?1:0,uTime:clock(),uAxis:0,uFlip:0,uAspect:w/h,uDispAmp:.175,uDispScale:12.2,uDispDrift:0,uSoft:.001,uLens:-.275,uDetail:5,uTop:hex(dk?'#2a2a2a':'#EFEFEF'),uFoot:hex(dk?'#0b0b0b':'#FFFFFF')}})},
+  pixel(u){buildPx();show(A,B);px.classList.add('on');const t=u*P_DUR;
+    for(const p of pxItems)p.e.style.opacity=clamp((t-p.a)/p.pd,0,1)-clamp((t-p.b)/p.pd,0,1);
+    const cs=Math.min(P_FADE,P_DUR*.5);let s=0;if(t>=cs)s=Math.ceil(clamp((t-cs)/(P_DUR-2*cs),0,1)*COLS)/COLS;
+    const x=s*100;pages[B].style.zIndex=1;pages[B].style.clipPath=`polygon(0% 0%,${x}% 0%,${x}% 100%,0% 100%)`}
+};
+
+/* scroll map — hero | liquid | wheel | iris | sphere | sheet | path | pixel | outro */
+const SEG=[[.08,.26],[.32,.50],[.54,.72],[.76,.94]];
+const FXS=[FX.liquid,FX.iris,FX.sheet,FX.pixel];
+const STEPS=SCN.length;
+function update(){
+  const p=clamp(scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight),0,1);
+  let a=STEPS-1,b=-1,u=0;
+  for(let i=0;i<SEG.length;i++){const s=SEG[i][0],e=SEG[i][1];if(p<s){a=i;break}if(p<e){a=i;b=i+1;u=(p-s)/(e-s);break}}
+  A=a;B=b;tU=u;
+  if(a+','+b!==lastPair){lastPair=a+','+b;sU=tU;drawKey=''}
+  if(b<0){glfx.forEach(g=>g.c.classList.remove('on'));px.classList.remove('on');const k='s'+a;if(drawKey!==k){drawKey=k;show(a)}}
+  stepEl.textContent=String((b<0?a:b)+1).padStart(2,'0')+' / '+String(STEPS).padStart(2,'0');
+  rail.style.transform=`scaleX(${p.toFixed(4)})`;
+}
+let lastY=scrollY;
+addEventListener('scroll',()=>{
+  update();const d=clamp(scrollY-lastY,-400,400);lastY=scrollY;
+  for(const i of vis){const s=scenes[SCN[i]];if(s&&s.push)s.push(d)}
+},{passive:true});
+$('top').addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
+new ResizeObserver(()=>{
+  glfx.forEach(g=>g.resize());pxKey='';
+  SCN.forEach(n=>{const s=scenes[n];if(s&&s.resize)s.resize()});
+  update();
+}).observe(stage);
+update();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
