@@ -48,6 +48,7 @@
         z-index: 5;
         background: transparent;
     }
+    #s-wheel{background:transparent}
     #spacer { height: 1300vh; }
 
     .scene {
@@ -66,6 +67,7 @@
     .scene.drag { cursor: grabbing; }
 
     .vp { position: absolute; inset: 0; }
+    #wv-f{position:fixed;pointer-events:none;z-index:7;visibility:hidden}
     .stage { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
     .card { position: absolute; left: 0; top: 0; background: #888; overflow: hidden; backface-visibility: visible; }
     .card img,.card video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
@@ -84,7 +86,7 @@
     @keyframes pin { from { filter: blur(14px); opacity: 0 } to { filter: blur(0); opacity: 1 } }
     .pm { display: flex; justify-content: space-between; margin-top: 6px; text-transform: uppercase; }
 
-    #map { position: absolute; left: 10px; top: 10px; width: 184px; height: 265px; background: #fff; z-index: 5; pointer-events: none; }
+    #map { display: none; }
     #map canvas { width: 100%; height: 100%; display: block; }
 
     #pg { perspective: 525px; perspective-origin: 50% 50%; }
@@ -166,6 +168,25 @@
 
     /* ── OUTRO ── */
     #s-outro { display: flex; align-items: center; justify-content: center; }
+    /* --- OUTRO: catch-log over lava --- */
+    #s-outro{justify-content:center}
+    #lavac{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .lv-shell{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
+    .lv-top{display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 1.6rem) 2rem 0;font-family:ui-monospace,Menlo,monospace;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(245,240,232,.45)}
+    .lv-word{display:flex;align-items:center;gap:.6rem;color:#f5f0e8;font-size:1rem;letter-spacing:.3em}
+    .lv-dot{display:block;width:6px;height:6px;border-radius:50%;background:#e8501a;box-shadow:0 0 12px #e8501a,0 0 28px rgba(232,80,26,.6);animation:lvPulse 3s ease-in-out infinite}
+    @keyframes lvPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+    .lv-ver{opacity:.6}
+    .lv-mid{flex:1}
+    .lv-bot{text-align:center;padding:0 2rem calc(env(safe-area-inset-bottom,0px) + 2.6rem);pointer-events:auto}
+    .lv-launch{font-family:ui-monospace,Menlo,monospace;font-size:.64rem;letter-spacing:.22em;text-transform:uppercase;color:rgba(245,240,232,.45);margin-bottom:1.1rem}
+    .lv-h1{font-family:Pirata One,serif;font-weight:400;font-size:clamp(2.2rem,7vw,4.6rem);line-height:1.02;letter-spacing:.01em;color:#f5f0e8;max-width:20ch;margin:0 auto 1.2rem;text-shadow:0 2px 30px rgba(232,80,26,.35)}
+    .lv-sub{font-family:ui-monospace,Menlo,monospace;font-size:.72rem;line-height:1.75;color:rgba(245,240,232,.5);max-width:52ch;margin:0 auto 1.6rem}
+    .lv-btn{font-family:ui-monospace,Menlo,monospace;font-size:.66rem;letter-spacing:.26em;text-transform:uppercase;color:#f5f0e8;background:none;border:1px solid rgba(245,240,232,.35);padding:12px 24px 12px 26px;cursor:pointer;transition:background .25s,color .25s}
+    .lv-btn:hover{background:#e8501a;border-color:#e8501a;color:#000}
+    .lv-arrow{position:absolute;top:50%;transform:translateY(-50%);font-size:2rem;color:rgba(245,240,232,.25);z-index:3;cursor:pointer;padding:12px;transition:color .3s;user-select:none}
+    .lv-arrow:hover{color:#f5f0e8}
+    .lv-left{left:1.2rem}.lv-right{right:1.2rem}
     .outro {
         text-align: center; text-transform: uppercase;
         display: flex; flex-direction: column; align-items: center; gap: 22px;
@@ -235,6 +256,7 @@
     <!-- 2 · WHEEL -->
     <section class="scene" id="s-wheel">
         <div class="vp" id="wv"><div class="stage" id="ws"></div></div>
+        <div class="vp" id="wv-f"><div class="stage" id="ws-f"></div></div>
         <div class="hint">Wheel · scroll, drag or move the cursor</div>
         <div id="peek"><div class="pf" id="pf"></div><div class="pm"><span id="pn">—</span><span id="py">—</span></div></div>
     </section>
@@ -254,12 +276,18 @@
 
     <!-- 5 · OUTRO -->
     <section class="scene" id="s-outro">
-        <div class="outro">
-            <img src="https://pub-6738c828bef548d69b3f13bdd680b5b0.r2.dev/Sig.png" alt="">
-            <h2>Premium Digital Silk</h2>
-            <p>Wheel · Sphere · Path</p>
-            <button id="top">Back to top</button>
+        <canvas id="lavac"></canvas>
+        <div class="lv-shell">
+            <div class="lv-top"><div class="lv-word"><span class="lv-dot"></span>DRAGON CATCHER</div><div class="lv-ver">v1.0 &bull; CAUGHT</div></div>
+            <div class="lv-mid"></div>
+            <div class="lv-bot">
+                <div class="lv-launch">CATCH LOG &bull; SPECIMEN N&ordm; 01</div>
+                <h1 class="lv-h1">Caught mid-flight.<br>Mounted in silk.</h1>
+                <div class="lv-sub">Forty-nine specimens from the hoard &mdash; wheel, sphere and path. The chase is over. Scroll back up any time to hunt again.</div>
+                <button class="lv-btn" id="top">Back to top</button>
+            </div>
         </div>
+        <div class="lv-arrow lv-left">&lsaquo;</div><div class="lv-arrow lv-right">&rsaquo;</div>
     </section>
 
     <div class="px" id="px"></div>
@@ -653,7 +681,7 @@ loader.load(
 
         skelH = totalH; chestY = cropMidY; camBase.copy(camera.position); camRestored = false;
         if (dragon && !dragonScaled) { dragon.scale.setScalar(Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5)); dragonScaled = true; }
-        scene.add(model);
+        scene.add(model); skelModel = model;
         initCurrentQuats();
         if (bones.mandible) { // jaw-back correction (one-time rigid offset, rides the skull)
             mandRestPos.copy(bones.mandible.position);
@@ -1064,10 +1092,12 @@ let grabL = 0, grabR = 0, excite = 0;
 window.__grabby = { get grabL(){return grabL}, get grabR(){return grabR}, get mouseVel(){return mouseVel}, get idleAmt(){return idleAmt}, get dragonReady(){return dragonReady}, get introT(){return introT}, TUNE };
 // ── debug handle (bones + dragon, for live verification) ──
 window.__replayIntro = function(){ introT = 0; introLast = -1; }; // debug: replay the flyby
-window.__D = { bones, restQuats, vertRest, vertCur, fingersL, fingersR, camera, scene, renderer, THREE, get mouseWorld(){return mouseWorld}, get drive(){return drive}, get dragon(){return dragon}, get dragonVel(){return dragonVel}, get idleAmt(){return idleAmt}, get introT(){return introT}, get camBase(){return camBase} };
+window.__D = { bones, restQuats, vertRest, vertCur, fingersL, fingersR, camera, scene, renderer, THREE, get mouseWorld(){return mouseWorld}, get drive(){return drive}, get dragon(){return dragon}, get dragonVel(){return dragonVel}, get idleAmt(){return idleAmt}, get introT(){return introT}, get camBase(){return camBase}, get skel(){return skelModel}, get hoop(){return hoopPhase}, get hoopT(){return hoopT} };
+window.__D.dolly = () => hoopDolly;
 
 // ══ MINI DRAGON — bee-scale chase target ═══════════════════════
 let dragon = null, dragonMixer = null, dragonScaled = false;
+let skelModel = null;
 const dragonVel = new THREE.Vector3(0.6, 0.1, 0);
 let dragonReady = false, dragonYaw = 0, dragonRoll = 0, dragonYawInit = false;
 let skelH = 15.2, chestY = 5;
@@ -1103,6 +1133,85 @@ initDragon();
 // Banked-flight steering: the target LEADS the cursor by dragonLead seconds so
 // the dragon aims where you're headed, darting around the point; on idle it
 // cruises lazy loops around the torso. Nose follows velocity, roll = the turn.
+/* ---- HOOP MOMENT (wheel scene): dragon threads the card ring, skeleton rises from below ---- */
+let hoopPhase = 'off', hoopT = 0, hoopMag = 0, hoopWallT0 = 0;
+let _wheelGoneT = 0; // sustained-exit timer: fling overshoot must never strobe the moment
+let hoopDolly = 0; // camera dolly 0..1: shrinks him INTO the ring during rise/hold, eases back after
+const _hoopStart = new THREE.Vector3();
+const _thc = document.getElementById('threecanvas');
+let _hoopCurve = null;
+function hoopBuildCurve() {
+    // ring center = screen center at the skeleton plane; R spans the ring
+    const halfH = camBase.z * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    const R = halfH * 0.95, cx = 0, cy = chestY;
+    const P = (x, y, z) => new THREE.Vector3(cx + x, cy + y, z);
+    _hoopCurve = new THREE.CatmullRomCurve3([
+        P(0.5 * R, -2.4 * R, 2.0), P(0.2 * R, -1.1 * R, 2.5), P(0, 0, 1.5),
+        P(-0.2 * R, 1.1 * R, 0.5), P(-0.4 * R, 2.4 * R, -1.5), P(-0.6 * R, 3.8 * R, -4.0)
+    ]);
+}
+function hoopBaseScale() { return Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5); }
+function hoopUpdate(dt) {
+    const st = window.__stage || { a: 0, b: -1 };
+    const settledWheel = (st.b < 0 && st.a === 1);
+    const wheelNear = settledWheel || (st.b === 1 && (st.u || 0) > 0.45) || (st.a === 1 && st.b === 2);
+    const wheelShow = settledWheel || st.b === 1; // ring scene on screen: skeleton plays IN FRONT of the cards
+    if (hoopPhase === 'off') {
+        // skeleton stays OUT of the ring until its cue — never parked center on arrival
+        if (skelModel) skelModel.visible = !wheelNear;
+        if ((settledWheel || (st.b === 1 && (st.u || 0) > 0.6)) && bonesReady && dragonReady && introT >= 1) {
+            hoopPhase = 'fly'; hoopT = 0; hoopWallT0 = performance.now(); _hoopStart.copy(dragon.position); hoopBuildCurve();
+            if (skelModel) { skelModel.position.y = -8; skelModel.visible = false; }
+            if (dragon) dragon.visible = true;
+        }
+        _wheelGoneT = 0;
+    } else if (!wheelShow) {
+        // fling overshoot beats the gate clamp by a frame or two — ride it out,
+        // the clamp brings us home. Only a sustained exit tears the moment down.
+        _wheelGoneT += dt;
+        const leavingFwd = (st.b === 2) || (st.a === 2);
+        const gated = (hoopPhase === 'fly' || hoopPhase === 'rise') && leavingFwd;
+        const leavingBack = (st.a === 0); // reverse scroll: tear down NOW, never linger over the hero
+        if ((!gated && _wheelGoneT > 0.45) || leavingBack) { // user genuinely scrolled on: everything back to normal
+            hoopPhase = 'off';
+            if (skelModel) { skelModel.position.y = 0; skelModel.visible = true; }
+            if (dragon) { dragon.visible = true; dragon.scale.setScalar(hoopBaseScale()); }
+            hoopMag = 0; _wheelGoneT = 0;
+        }
+    } else if (hoopPhase === 'fly') {
+        _wheelGoneT = 0;
+        hoopT += dt;
+        if (skelModel) skelModel.visible = false; // latched for the pass: no mid-dive strobe
+        if (performance.now() - hoopWallT0 > 25000) { hoopPhase = 'hold'; if (dragon) dragon.visible = false; } // failsafe: never trap the scroll
+        else if (hoopT > 2.8) { // dragon exits top: done for this scene; skeleton's cue
+            hoopPhase = 'rise'; hoopT = 0;
+            if (dragon) dragon.visible = false;
+            if (skelModel) { skelModel.position.y = -8; skelModel.visible = true; }
+        }
+    } else if (hoopPhase === 'rise') {
+        _wheelGoneT = 0;
+        hoopT += dt;
+        if (skelModel) skelModel.visible = true; // latched once cued: never blinks mid-rise
+        if (performance.now() - hoopWallT0 > 25000) hoopPhase = 'hold'; // failsafe: never trap the scroll
+        else {
+        const uu = clamp(hoopT / 3.5, 0, 1), e = uu * uu * (3 - 2 * uu);
+        if (skelModel) skelModel.position.y = -8 + 8 * e; // same path up from below, parks dead center
+        if (hoopT > 3.7) hoopPhase = 'hold';
+        }
+    } else if (skelModel) {
+        _wheelGoneT = 0;
+        skelModel.position.y += (0 - skelModel.position.y) * (1 - Math.exp(-dt * 6)); // hold center ring
+    }
+    // front only when truly settled: covers + cards hide the dive/mid-rise halves everywhere else
+    if (_thc) _thc.style.zIndex = settledWheel ? '6' : '2';
+    const dollyT = (hoopPhase === 'rise' || hoopPhase === 'hold') ? 1 : 0; // fly keeps its verified framing
+    hoopDolly += (dollyT - hoopDolly) * (1 - Math.exp(-dt * 1.4));
+    // dragon stays semi-big for its pass (eases in, never fights the intro)
+    hoopMag += (((hoopPhase === 'fly') ? 1 : 0) - hoopMag) * (1 - Math.exp(-dt * 3));
+    if (dragon && dragonScaled && hoopPhase === 'fly' && introT >= 1)
+        dragon.scale.setScalar(hoopBaseScale() * (1 + 11 * hoopMag));
+}
+
 function updateDragon(dt, t) {
     if (!dragonReady) return;
     if (dragonMixer) dragonMixer.update(dt * (introT < 1 ? 2.4 : (0.75 + Math.min(dragonVel.length(), 6) * 0.12)));
@@ -1137,6 +1246,16 @@ function updateDragon(dt, t) {
         dragon.position.add(_dDir); // snap to path point (deterministic, not frame-rate sculpted)
         dragon.scale.setScalar(Math.max((skelH * TUNE.dragonSize) / 678.29, 1e-5) * Math.max(m, 1));
     }
+    else if (hoopPhase === 'fly') {
+        // HOOP RISE — from below through the ring center, out the top, gone for the scene
+        const u = clamp(hoopT / 2.8, 0, 1);
+        _hoopCurve.getPoint(u, _dDir);
+        const b = (() => { const uu = clamp(hoopT / 0.5, 0, 1); return uu * uu * (3 - 2 * uu); })();
+        _dDir.lerpVectors(_hoopStart, _dDir, b); // blend in from wherever the chase left it
+        _dDir.sub(dragon.position);
+        if (dt > 1e-4) dragonVel.copy(_dDir).divideScalar(Math.max(dt, 1e-4)); // segment velocity → faces travel dir
+        dragon.position.add(_dDir); // snap to path point (deterministic, not frame-rate sculpted)
+    }
     else {
     _dDir.copy(_dTarget).sub(dragon.position);
     const dist = _dDir.length();
@@ -1164,6 +1283,114 @@ function updateDragon(dt, t) {
 }
 
 const clock = new THREE.Clock();
+/* ---- FIRE BREATH: click/tap to breathe. Ring-sheet flames (ref: TheriaC_4_ strip),
+   additive sprites so the black sheet background drops out. Factory is shared:
+   the egg scene instantiates its own copy via window.__makeFireBreath. ---- */
+const FIRE_URL='https://user.uploads.dev/file/b4707b504c653bf9590578a86babbc57.png';
+const FIRE_N=9;
+let __whooshAC=null;
+window.__whoosh=function(big){
+  try{
+    __whooshAC=__whooshAC||new (window.AudioContext||window.webkitAudioContext)();
+    const ac=__whooshAC; if(ac.state==='suspended')ac.resume();
+    const dur=big?1.1:0.7, sr=ac.sampleRate, buf=ac.createBuffer(1,Math.max(1,Math.floor(sr*dur)),sr), ch=buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++){const u=i/ch.length;ch[i]=(Math.random()*2-1)*Math.pow(1-u,1.6)*Math.pow(Math.min(1,u*8),0.7);}
+    const src=ac.createBufferSource(); src.buffer=buf;
+    const f=ac.createBiquadFilter(); f.type='lowpass'; f.Q.value=0.8;
+    f.frequency.setValueAtTime(big?900:1400,ac.currentTime);
+    f.frequency.exponentialRampToValueAtTime(120,ac.currentTime+dur);
+    const g=ac.createGain();
+    g.gain.setValueAtTime(0.0001,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(big?0.5:0.28,ac.currentTime+0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+dur);
+    src.connect(f); f.connect(g); g.connect(ac.destination); src.start();
+  }catch(e){}
+};
+window.__makeFireBreath=function(TH, scene, o){
+  const P={n:56,size0:0.3,size1:1.8,speed:7,spread:0.4,life:[0.5,0.9],lightD:25,lightI:60,emitT:0.7,rate:80,cool:1.0,tint:0xffffff};
+  Object.assign(P,o||{});
+  const pool=[]; let tex=null, cool=0, emit=0, acc=0;
+  let aimFn=null, pendingAim=null;
+  const mouth=new TH.Vector3(), dir=new TH.Vector3(0,0,1);
+  const light=new TH.PointLight(0xff6a1e,0,P.lightD,1.7); scene.add(light);
+  new TH.TextureLoader().load(FIRE_URL, t=>{
+    t.wrapS=t.wrapT=TH.ClampToEdgeWrapping;
+    if(TH.SRGBColorSpace!==undefined&&'colorSpace' in t)t.colorSpace=TH.SRGBColorSpace;
+    tex=t; for(const p of pool)p.onTex();
+    if(pendingAim){const a=pendingAim;pendingAim=null;api.trigger(a);}
+  });
+  function mk(){
+    const tm=new TH.SpriteMaterial({blending:TH.AdditiveBlending,depthWrite:false,transparent:true,opacity:0});
+    const sp=new TH.Sprite(tm); sp.visible=false; scene.add(sp);
+    const p={sp,age:1,life:1,vx:0,vy:0,vz:0,s0:1,s1:2,spin:0,
+      onTex(){ if(!tex||tm.map)return; tm.map=tex.clone(); tm.map.repeat.set(1/FIRE_N,1); tm.map.needsUpdate=true; }};
+    return p;
+  }
+  for(let i=0;i<P.n;i++)pool.push(mk());
+  const _v=new TH.Vector3();
+  function fireOne(){
+    for(const p of pool){
+      if(p.age<p.life)continue;
+      aimFn(mouth,dir);
+      p.age=0; p.life=P.life[0]+Math.random()*(P.life[1]-P.life[0]);
+      _v.copy(dir);
+      _v.x+=(Math.random()-0.5)*P.spread; _v.y+=(Math.random()-0.5)*P.spread; _v.z+=(Math.random()-0.5)*P.spread;
+      _v.normalize();
+      const sp=P.speed*(0.75+Math.random()*0.5);
+      p.vx=_v.x*sp; p.vy=_v.y*sp; p.vz=_v.z*sp;
+      p.sp.visible=true;
+      p.sp.position.copy(mouth).addScaledVector(_v,Math.random()*P.size0*2);
+      p.s0=P.size0*(0.7+Math.random()*0.6); p.s1=P.size1*(0.8+Math.random()*0.5);
+      p.spin=(Math.random()-0.5)*6;
+      p.sp.material.rotation=Math.random()*Math.PI*2;
+      p.sp.material.color.setHex(P.tint).offsetHSL((Math.random()-0.5)*0.03,0,(Math.random()-0.5)*0.08);
+      p.onTex();
+      light.position.copy(mouth);
+      return;
+    }
+  }
+  const api={
+    trigger(a){
+      if(cool>0)return false;
+      if(!tex){pendingAim=a;return true;}
+      cool=P.cool; emit=P.emitT; acc=0; aimFn=a;
+      window.__whoosh(P.size1>10);
+      return true;
+    },
+    update(dt){
+      cool-=dt;
+      if(emit>0&&aimFn){emit-=dt;acc+=dt*P.rate;let n=Math.floor(acc);acc-=n;while(n-->0)fireOne();}
+      let glow=0;
+      for(const p of pool){
+        if(p.age>=p.life){if(p.sp.visible){p.sp.visible=false;p.sp.material.opacity=0;}continue;}
+        p.age+=dt; const u=Math.min(1,p.age/p.life);
+        p.sp.position.x+=p.vx*dt; p.sp.position.y+=p.vy*dt; p.sp.position.z+=p.vz*dt;
+        const s=p.s0+(p.s1-p.s0)*(1-Math.pow(1-u,2));
+        p.sp.scale.set(s,s,1);
+        p.sp.material.rotation+=p.spin*dt;
+        if(p.sp.material.map)p.sp.material.map.offset.x=Math.min(FIRE_N-1,Math.floor(u*FIRE_N))/FIRE_N;
+        const op=Math.min(1,u*9)*(1-Math.max(0,(u-0.35)/0.65));
+        p.sp.material.opacity=op; glow=Math.max(glow,op);
+      }
+      const tgt=(emit>0?1:glow)*P.lightI;
+      light.intensity+=(tgt*(emit>0?(0.75+0.25*Math.random()):1)-light.intensity)*(emit>0?0.6:0.12);
+    },
+    stat(){let l=0;for(const p of pool)if(p.age<p.life)l++;return{cool:+cool.toFixed(2),emit:+emit.toFixed(2),tex:!!tex,live:l};}
+  };
+  return api;
+};
+// hero-scene dragon breath: mouth ahead of the nose, along travel dir (cursor hunt)
+const heroBreath=window.__makeFireBreath(THREE,scene,{size0:0.28,size1:1.7,speed:7.5,spread:0.42,life:[0.5,0.9],lightD:26,lightI:50,rate:85,cool:1.0});
+const _heroFace=new THREE.Vector3(0,0,1);
+window.__heroFire=function(){
+  if(!dragonReady||!dragon||dragon.visible===false)return false;  return heroBreath.trigger((m,d)=>{
+    if(dragonVel.lengthSq()>0.002)_heroFace.copy(dragonVel).normalize();
+    const s=Math.max((skelH*TUNE.dragonSize)/678.29,1e-5);
+    m.copy(dragon.position).addScaledVector(_heroFace,s*320);
+    d.copy(_heroFace);
+  });
+};
+window.__D.fbStat=()=>heroBreath.stat();
 const MOUSE_ALPHA60 = 1.0;
 
 const _vertCache = {};
@@ -1374,7 +1601,9 @@ function animate() {
         }
     }
 
+        hoopUpdate(dt);
         if (typeof updateDragon === 'function') updateDragon(dt, performance.now() * 0.001);
+        heroBreath.update(dt);
         // intro flyby camera: shake + fov kick peak as the dragon whips past, then home
         if (introT < 1) {
             // wing-wind whisper: swells only for the crossing beat (~1 s), then gone
@@ -1385,6 +1614,9 @@ function animate() {
             camera.position.copy(camBase).add(shakeVec);
         } else if (!camRestored) {
             camera.position.copy(camBase); camRestored = true;
+        } else if (hoopDolly > 0.001) {
+            camera.position.copy(camBase);
+            camera.position.z = camBase.z * (1 + 0.8 * hoopDolly); // ×1.8 back: ring dwarfs him, front cards cross over
         }
     renderer.render(scene, camera);
 }
@@ -1406,6 +1638,16 @@ const NAMES=FILES.map(f=>f.replace(/\.[a-z0-9]+$/i,'').replace(/_/g,' '));
 const YEARS=FILES.map(()=>'');
 const SRC=FILES.map(f=>R2+f);
 const ISVID=FILES.map(f=>/\.mp4$/i.test(f));
+/* ---- sphere gallery: demon pantheon, own R2 bucket ---- */
+const SPH_BASE='https://pub-bc5f390d4689422399113d2304d11c12.r2.dev/';
+const SPH_FILES=["Abaddon, Lord of Decay.jfif","Asmodeus, Soul Devourer.jfif","Astaroth, Harbinger of Ruin.jfif","Azazel, Herald of Despair.jfif","Baal, Prince of Blight.jfif","Beelzebub, Bringer of Pestilence.jfif","Belial, Eternal Tormentor.jfif","Belphegor, Fiend of the Pit.jfif","Dagon, Voice of the Deep.jfif","Foras, Plaguebearer.jfif","Leviathan, Warden of Abyss.jfif","Lilith, Queen of Night.jfif","Mammon, Corruptor of Flesh.jfif","Marbas, Twilight Beast.jfif","Moloch, Idol of Blood.jfif","Orobas, Oathbreaker.jfif","Paimon, Keeper of Secrets.jfif","Phenex, Ashen Phoenix.jfif","Verrine, Shadow of Greed.jfif","Vine, Crown of Thorns.jfif"];
+const SPH_SRC=SPH_FILES.map(f=>SPH_BASE+encodeURIComponent(f));
+/* ---- wheel carousel: numbered SVG plates, own R2 bucket ---- */
+const WHL_BASE='https://pub-f572708a1ee44ad59ed71188a84ec48b.r2.dev/';
+const WHL_FILES=["1.svg","2.svg","3.svg","4.svg","5.svg","6.svg","7.svg","8.svg","9.svg","10.svg","11.svg","12.svg","13.svg","14.svg","15.svg","16.svg","17.svg","18.svg","19.svg","20.svg","21.svg"];
+const WHL_SRC=WHL_FILES.map(f=>WHL_BASE+f);
+function whlEl(i){const m=document.createElement('img');m.src=WHL_SRC[i%WHL_SRC.length];m.alt=WHL_FILES[i%WHL_FILES.length];m.draggable=false;m.onerror=()=>{const n=+(m.dataset.n||0)+1;m.dataset.n=n;if(n>WHL_SRC.length+1)return;m.src=WHL_SRC[(n===1?i:i+n-1)%WHL_SRC.length];};return m}
+function sphEl(i){const m=document.createElement('img');m.src=SPH_SRC[i%SPH_SRC.length];m.alt=SPH_FILES[i%SPH_FILES.length];m.draggable=false;m.onerror=()=>{const n=+(m.dataset.n||0)+1;m.dataset.n=n;if(n>SPH_SRC.length+1)return;m.src=SPH_SRC[(n===1?i:i+n-1)%SPH_SRC.length];};return m}
 function sourceIdx(i){const n=SRC.length;let s=Math.max(2,Math.round(n*.618));while(gcd(s,n)!==1)s++;return (i*s)%n}
 function mediaEl(k){
   if(ISVID[k]){
@@ -1433,7 +1675,7 @@ function drawFX(){
 }
 function loop(now){
   const dt=Math.min((now-last)/1000,.1);last=now;
-  if(B>=0&&sU!==tU){sU+=(tU-sU)*(1-Math.exp(-dt*7));if(Math.abs(tU-sU)<1e-4)sU=tU;drawFX()}
+  if(B>=0&&(needDraw||sU!==tU)){sU+=(tU-sU)*(1-Math.exp(-dt*7));if(Math.abs(tU-sU)<1e-4)sU=tU;needDraw=false;drawFX()}
   for(const i of vis){const s=scenes[SCN[i]];if(s)s.frame(dt,now)}
   requestAnimationFrame(loop);
 }
@@ -1443,12 +1685,12 @@ const ramp=ms=>{let t0;return()=>{t0??=performance.now();const t=clamp((performa
 scenes.wheel=(()=>{
   const C={size:1.52,count:93,rv:.315,tilt:-16.5,yaw:90,lean:1,persp:600,cw:74,asp:.625,
     scroll:.06,drag:.02,ease:.02,idle:.02,drive:.05,nearLimit:.8,introMs:1800,introFrom:.02,introTurn:90,tiltClamp:10};
-  const sc=document.getElementById('s-wheel'),vp=document.getElementById('wv'),st=document.getElementById('ws');
+  const sc=document.getElementById('s-wheel'),vp=document.getElementById('wv'),st=document.getElementById('ws'),fst=document.getElementById('ws-f'),vpf=document.getElementById('wv-f');
   const items=[];let radius,cw,ch;
   function measure(){
     const fit=Math.min(innerWidth,innerHeight),P=C.persp*C.size;
     radius=Math.min(clamp(fit*C.rv,120,900)*C.size,P*C.nearLimit);
-    cw=C.cw*C.size;ch=cw*C.asp;vp.style.perspective=P.toFixed(1)+'px';
+    cw=C.cw*C.size;ch=cw*C.asp;vp.style.perspective=P.toFixed(1)+'px';vpf.style.perspective=vp.style.perspective;
   }
   function layout(){
     const step=360/C.count;
@@ -1457,7 +1699,7 @@ scenes.wheel=(()=>{
       el.style.transform=`rotateY(${(i*step).toFixed(3)}deg) translateZ(${radius.toFixed(2)}px) rotateY(${C.yaw}deg) rotateX(${C.lean}deg) translate(-50%,-50%)`;
     });
   }
-  for(let i=0;i<C.count;i++){const e=card('card',i);st.appendChild(e);items.push(e)}
+  for(let i=0;i<C.count;i++){const e=card('card',i);e.replaceChildren(whlEl(i));e.dataset.k=i%WHL_SRC.length;st.appendChild(e);items.push(e)}
   measure();layout();
   let spin=0,pend=0,dragging=false,pid=null,lx=0,lmx=null;
   const intro=ramp(C.introMs);let ik=0,ip=0;
@@ -1485,10 +1727,10 @@ scenes.wheel=(()=>{
   function show(k){
     if(k===shown)return;shown=k;
     const l=document.createElement('div');l.className='pl';
-    l.appendChild(mediaEl(k));pf.appendChild(l);
+    l.appendChild(whlEl(k));pf.appendChild(l);
     while(pf.children.length>3)pf.removeChild(pf.firstChild);
     l.addEventListener('animationend',()=>{while(pf.firstChild!==l)pf.removeChild(pf.firstChild)},{once:true});
-    pn.textContent=String(+k+1).padStart(2,'0')+' · '+NAMES[k];py.textContent=YEARS[k];
+    pn.textContent=String(+k+1).padStart(2,'0')+' · '+WHL_FILES[k].replace(/\.svg$/i,'');py.textContent='';
   }
   addEventListener('resize',()=>{measure();layout()});
   return{push(d){pend+=d*C.scroll},resize(){measure();layout()},frame(){
@@ -1498,6 +1740,8 @@ scenes.wheel=(()=>{
     const s=pend*C.ease;pend-=s;spin+=s;
     const k=C.introFrom+(1-C.introFrom)*ik;
     st.style.transform=`scale3d(${k},${k},${k}) rotateX(${C.tilt}deg) rotateY(${spin.toFixed(3)}deg)`;
+      fst.style.transform=st.style.transform;
+      for(let bi=0;bi<items.length;bi++){const el=items[bi],a=(bi*(360/C.count)+spin)*Math.PI/180,home=Math.cos(a)>0?fst:st;if(el.parentNode!==home)home.appendChild(el);}
     if(++tick%3===0){
       const n=pick();
       if(n&&n!==activeCard){activeCard=n;show(+n.dataset.k)}
@@ -1507,7 +1751,7 @@ scenes.wheel=(()=>{
 
 /* ================= SPHERE ================= */
 scenes.sphere=(()=>{
-  const C={count:65,maxR:430,minR:150,rv:.43,spacing:.29,asp:1.28,fit:1.05,persp:1400,drag:.07,ease:.25,idle:.075,zoomStep:3,zoomMin:-360,maxNear:13.5,zoomEase:.17,introMs:1800,introFrom:.02,introTurn:140};
+  const C={count:20,maxR:430,minR:150,rv:.43,spacing:.29,asp:1.28,fit:1.05,persp:1400,drag:.07,ease:.25,idle:.075,zoomStep:3,zoomMin:-360,maxNear:13.5,zoomEase:.17,introMs:1800,introFrom:.02,introTurn:140};
   const sc=document.getElementById('s-sphere'),vp=document.getElementById('sv'),st=document.getElementById('ss');
   vp.style.perspective=C.persp+'px';
   const D=Math.PI/180,GA=Math.PI*(3-Math.sqrt(5));
@@ -1540,7 +1784,7 @@ scenes.sphere=(()=>{
       items[i].style.width=iw+'px';items[i].style.height=ih+'px';
     }
   }
-  for(let i=0;i<C.count;i++){const e=card('card',i);st.appendChild(e);items.push(e)}
+  for(let i=0;i<C.count;i++){const e=card('card',i);e.replaceChildren(sphEl(i));e.dataset.k=i;st.appendChild(e);items.push(e)}
   measure();layout();
   let rot=mMul(rx(-6*D),[1,0,0,0,1,0,0,0,1]),px=0,py=0,zoom=restZoom,tz=restZoom,dragging=false,pid=null,lx=0,ly=0,fc=0;
   const intro=ramp(C.introMs);let ik=0,ip=0;
@@ -1601,14 +1845,11 @@ scenes.path=(()=>{
   const rnd=(i,k)=>{const x=Math.sin(i*127.1+k*311.7+C.seed*74.7)*43758.5453;return x-Math.floor(x)};
   const items=[];
   for(let i=0;i<C.count;i++){
-    const el=card('it',i),t=i/C.count,fr=frameAt(t);
+    const t=i/C.count,fr=frameAt(t);
     let ox=(rnd(i,1)-.5)*2*C.scX,oy=(rnd(i,2)-.5)*2*C.scY;
     const r=Math.hypot(ox,oy)||1e-6;if(r<C.scMin){ox*=C.scMin/r;oy*=C.scMin/r}
-    const oz=(rnd(i,3)-.5)*2*C.scZ,w=C.size,h=Math.round(w/1.4);
-    el.style.cssText+=`width:${w}px;height:${h}px;margin:${-h/2}px 0 0 ${-w/2}px;`;
-    el.style.borderRadius='var(--r,0%)';
-    world.appendChild(el);
-    items.push({el,w,h,off:false,g:-1,p:add(add(curveAt(t),mul(fr.s,ox)),add(mul(fr.u,oy),mul(fr.f,oz)))});
+    const oz=(rnd(i,3)-.5)*2*C.scZ;
+    items.push({grp:null,mats:null,w:C.size,h:Math.round(C.size/1.4),off:true,g:-1,phase:0,speed:0.3,p:add(add(curveAt(t),mul(fr.s,ox)),add(mul(fr.u,oy),mul(fr.f,oz)))});
   }
   let target=0,cur=0,kick=0,lastR=-1,wantX=0,wantY=0,gotX=0,gotY=0;
   addEventListener('pointermove',e=>{wantX=(e.clientX/innerWidth-.5)*2;wantY=(e.clientY/innerHeight-.5)*2});
@@ -1645,7 +1886,148 @@ scenes.path=(()=>{
     cx.fillStyle='#000';cx.fillRect(Math.round(x-1.5),Math.round(y-1.5),3,3);
   }
 
-  return{push(d){target+=d*C.wheel;kick=Math.min(1,kick+Math.abs(d)/C.radiusAt)},resize(){},frame(dt){
+  /* ---- live 3D eggs: one shared renderer, 19 GLBs cloned over the 200 slots ---- */
+  const EGG_BASE='https://pub-f7675bcb164d4c788b52d7e86a92b797.r2.dev/compressed/';
+  const EGG_MODELS=["Ashscale","Barkskin","Bloodwine","Brassyhide","Cloudhoof","Deepglimmer","Dirtmaw","Earthclaw","Embermaw","Flameblood","Frostbite","Moonscale","Mudscale","Nightwing","Rustclaw","Scarleteye","Velvetwing","Venomscale","Voidheart"];
+  let T3=null,eggGL=null;
+  window.__eggs=()=>({ready:!!(eggGL&&eggGL.protosDone)});
+  async function ensureEggs(){
+    if(ensureEggs._p)return ensureEggs._p;
+    ensureEggs._p=(async()=>{
+      window.__eggProg='imports';
+      const[t3mod,loadMod,meshMod,roomMod]=await Promise.all([
+        import('https://esm.sh/three@0.160.0'),
+        import('https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js'),
+        import('https://esm.sh/meshoptimizer@0.22.0'),
+        import('https://esm.sh/three@0.160.0/examples/jsm/environments/RoomEnvironment.js')]);
+      T3=t3mod;
+      const{GLTFLoader}=loadMod,{MeshoptDecoder}=meshMod,{RoomEnvironment}=roomMod;
+      await MeshoptDecoder.ready;
+      window.__eggProg='renderer';
+      const cv=document.createElement('canvas');
+      cv.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,#232936 0%,#12141b 55%,#0a0b0f 100%)';
+      sc.prepend(cv);
+      const renderer=new T3.WebGLRenderer({canvas:cv,alpha:true,antialias:true});
+      renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+      renderer.toneMapping=T3.ACESFilmicToneMapping;
+      const scene=new T3.Scene();
+      scene.add(new T3.HemisphereLight(0xffffff,0x334455,1.1));
+      const key=new T3.DirectionalLight(0xffffff,2.0);key.position.set(3,5,4);scene.add(key);
+      const rim=new T3.DirectionalLight(0x88aaff,0.9);rim.position.set(-4,2,-3);scene.add(rim);
+      const pm=new T3.PMREMGenerator(renderer);
+      scene.environment=pm.fromScene(new RoomEnvironment(),0.04).texture;
+      const cam=new T3.PerspectiveCamera(60,1,1,60000);
+      // renderer is live NOW: slots attach progressively as each model arrives, so the
+      // field paints after the first GLB instead of after all 20 downloads
+      eggGL={renderer,scene,cam,vx:new T3.Vector3(),vy:new T3.Vector3(),vz:new T3.Vector3(),ve:new T3.Vector3(),vv:new T3.Vector3(),m:new T3.Matrix4(),q2:new T3.Quaternion(),e:new T3.Euler(),up:new T3.Vector3(0,1,0),lw:0,lh:0,drg:null,protosDone:false,protos:[]};
+      window.__eggs=()=>({ready:eggGL.protosDone,slots:items.length,visible:items.filter(i=>!i.off).length,br:eggGL.breath?eggGL.breath.stat():null,shot(){eggGL.renderer.render(eggGL.scene,eggGL.cam);return eggGL.renderer.domElement.toDataURL();},dbg(){const v=new T3.Vector3(),o=[];for(const it of items){if(it.off||!it.grp)continue;v.set(it.p[0],it.p[1],it.p[2]).project(eggGL.cam);o.push([Math.round(v.x*100)/100,Math.round(v.y*100)/100,Math.round(v.z*100)/100]);if(o.length>=5)break;}const c=eggGL.renderer.domElement;let dr=null;if(eggGL.drg&&eggGL.drg.init){v.copy(eggGL.drg.pos).project(eggGL.cam);dr=[Math.round(v.x*100)/100,Math.round(v.y*100)/100,Math.round(v.z*100)/100];}return{proj:o,drg:dr,cam:eggGL.cam.position.toArray().map(Math.round),cv:[c.width,c.height],cw:[c.clientWidth,c.clientHeight],sc:[sc.clientWidth,sc.clientHeight]};}});
+      eggResize();
+      const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);
+      const _box=new T3.Box3(),_c=new T3.Vector3(),_s=new T3.Vector3();
+      function attachSlot(it,idx,P){
+        const grp=new T3.Group();grp.position.set(it.p[0],it.p[1],it.p[2]);grp.scale.setScalar(P.scale);
+        const cl=P.root.clone(true),mats=[];
+        cl.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;const b=o.material.color.clone();mats.push({m:o.material,base:b,lum:0.2126*b.r+0.7152*b.g+0.0722*b.b});}});
+        grp.add(cl);grp.visible=false;scene.add(grp);
+        it.grp=grp;it.mats=mats;it.phase=(idx%EGG_MODELS.length)*0.7;it.speed=0.25+(idx%5)*0.07;it.off=true;
+      }
+      function attachProto(k,P){
+        items.forEach((it,idx)=>{if(it.grp||(idx%EGG_MODELS.length)!==k)return;attachSlot(it,idx,P);});
+        cv.style.background='none'; // first eggs in: drop the loading backdrop, scene shows through again
+      }
+      async function loadProto(n){
+        try{
+          const gltf=await loader.loadAsync(EGG_BASE+'Dragon_Egg_-_'+n+'.glb');
+          _box.setFromObject(gltf.scene);_box.getCenter(_c);_box.getSize(_s);
+          const r=Math.max(_s.x,_s.y,_s.z)/2||1;
+          gltf.scene.position.sub(_c);
+          return{root:gltf.scene,scale:150/r};
+        }catch(e){console.warn('egg model failed:',n,e);return null;}
+      }
+      // dragon loads ALONGSIDE the eggs, not after them
+      loader.loadAsync('https://user.uploads.dev/file/415e6c7fb51e2c48620feb112a36bdb4.glb').then(dg=>{
+        const _db=new T3.Box3(),_dc=new T3.Vector3(),_ds=new T3.Vector3();
+        _db.setFromObject(dg.scene);_db.getCenter(_dc);_db.getSize(_ds);
+        const dr=Math.max(_ds.x,_ds.y,_ds.z)/2||1;
+        dg.scene.position.sub(_dc);
+        dg.scene.scale.setScalar(110/dr);
+        const mx=new T3.AnimationMixer(dg.scene);
+        if(dg.animations&&dg.animations.length)mx.clipAction(dg.animations[0]).play();
+        scene.add(dg.scene);
+        eggGL.drg={root:dg.scene,mixer:mx,init:false,pos:new T3.Vector3(),px:0,py:0,pz:0};
+      }).catch(e=>console.warn('egg dragon failed',e));
+      // 6-at-a-time parallel; each model decorates its slots the moment it arrives
+      window.__eggProg='loading models';
+      const protos=new Array(EGG_MODELS.length).fill(null);
+      let next=0;
+      async function worker(){
+        while(next<EGG_MODELS.length){
+          const k=next++;
+          const P=await loadProto(EGG_MODELS[k]);
+          protos[k]=P;
+          if(P)attachProto(k,P);
+        }
+      }
+      await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
+      // orphans of failed models borrow the nearest loaded one so no slot stays empty
+      const alive=protos.map((P,k)=>P?k:-1).filter(k=>k>=0);
+      if(alive.length){
+        items.forEach((it,idx)=>{if(it.grp)return;attachSlot(it,idx,protos[alive[idx%alive.length]]);});
+      }
+      eggGL.protos=protos;eggGL.protosDone=true;
+      window.__eggProg='done';
+    })();
+    return ensureEggs._p;
+  }
+  function eggResize(){
+    if(!eggGL)return;
+    const w=sc.clientWidth||2,h=sc.clientHeight||2;
+    if(w===eggGL.lw&&h===eggGL.lh)return;eggGL.lw=w;eggGL.lh=h;
+    eggGL.renderer.setSize(w,h,false);
+    const c=eggGL.cam;c.aspect=w/h;c.fov=2*Math.atan((h/2)/525)*180/Math.PI;c.updateProjectionMatrix();
+  }
+  function _eggCam(g,s,up,f,eye){
+    g.vx.set(s[0],s[1],s[2]);g.vy.set(up[0],up[1],up[2]);g.vz.set(-f[0],-f[1],-f[2]);
+    g.m.makeBasis(g.vx,g.vy,g.vz);
+    g.cam.quaternion.setFromRotationMatrix(g.m);
+    g.cam.position.set(eye[0]-f[0]*525,eye[1]-f[1]*525,eye[2]-f[2]*525);
+    g.cam.updateMatrixWorld();
+  }
+  function _eggAim(g,it,now,gx,gy,wx,wy){
+    // look at the cursor (eased + a velocity kick so they react to movement), idle sway when still
+    g.e.set(-(gy+(wy-gy)*1.2)*0.4+Math.cos(now*0.5+it.phase*1.3)*0.06,(gx+(wx-gx)*1.2)*0.55+Math.sin(now*0.6+it.phase)*0.08,0);
+    g.q2.setFromEuler(g.e);
+    it.grp.quaternion.copy(g.cam.quaternion).multiply(g.q2);
+    // hover float along screen-up
+    const b=Math.sin(now*it.speed*2.2+it.phase)*12;
+    it.grp.position.set(it.p[0]+g.vy.x*b,it.p[1]+g.vy.y*b,it.p[2]+g.vy.z*b);
+  }
+  function eggAim(m,d){
+    // mouth ahead of the nose; breath steered toward the last click (falls back to forward)
+    const D0=eggGL.drg,B=eggGL.basis;
+    m.copy(D0.pos);
+    if(!B){d.set(0,0,1);return;}
+    m.set(m.x+B.f[0]*130,m.y+B.f[1]*130,m.z+B.f[2]*130);
+    let px=B.eye[0]+B.f[0]*320,py=B.eye[1]+B.f[1]*320,pz=B.eye[2]+B.f[2]*320;
+    const a=eggGL.aimN;
+    if(a&&(performance.now()*0.001-a.t)<1.5){
+      const k=B.w2*B.D/525*0.85,ky=k*B.h2/Math.max(1,B.w2);
+      px+=B.s[0]*a.x*k+B.up[0]*(-a.y*ky);
+      py+=B.s[1]*a.x*k+B.up[1]*(-a.y*ky);
+      pz+=B.s[2]*a.x*k+B.up[2]*(-a.y*ky);
+    }
+    d.set(px-m.x,py-m.y,pz-m.z).normalize();
+  }
+  window.__eggFire=function(nx,ny){
+    if(!eggGL||!eggGL.drg)return false;
+    if(!eggGL.breath){
+      if(!window.__makeFireBreath)return false;
+      eggGL.breath=window.__makeFireBreath(T3,eggGL.scene,{n:64,size0:55,size1:340,speed:1500,spread:0.32,life:[0.6,1.0],lightD:6000,lightI:6e6,rate:80,cool:0.9});
+    }
+    eggGL.aimN={x:nx,y:ny,t:performance.now()*0.001};
+    return eggGL.breath.trigger(eggAim);
+  };
+  return{push(d){target+=d*C.wheel;kick=Math.min(1,kick+Math.abs(d)/C.radiusAt)},resize(){eggResize()},frame(dt){
     gotX+=(wantX-gotX)*(1-Math.exp(-dt/C.mouseEase));gotY+=(wantY-gotY)*(1-Math.exp(-dt/C.mouseEase));
     target+=C.drift*dt;cur+=(target-cur)*(1-Math.exp(-dt/C.rubber));
     kick*=Math.exp(-dt/C.radiusFall);if(kick<.001)kick=0;
@@ -1656,28 +2038,65 @@ scenes.path=(()=>{
     const nudge=add(mul(s,gotX*C.mouseX*C.mouseGain),mul(up,gotY*C.mouseY*C.mouseGain));
     const eye=add(eye0,nudge),aim=add(aim0,mul(nudge,1-C.mouseTurn)),f=norm(sub(aim,eye));
     s=cross(f,[0,-1,0]);if(len(s)<.02)s=cross(f,[1,0,0]);s=norm(s);up=norm(cross(s,f));
-    const m=[s[0],up[0],-f[0],0,s[1],up[1],-f[1],0,s[2],up[2],-f[2],0,-dot(s,eye),-dot(up,eye),dot(f,eye),1];
-    world.style.transform='matrix3d('+m.map(v=>v.toFixed(5)).join(',')+')';
-    const rot='matrix3d('+[s[0],s[1],s[2],0,up[0],up[1],up[2],0,-f[0],-f[1],-f[2],0,0,0,0,1].map(v=>v.toFixed(4)).join(',')+')';
+    if(!eggGL){ensureEggs().catch(e=>{window.__eggErr=String((e&&e.stack)||e).slice(0,500)});}
+    else{
+    if(eggGL.breath)eggGL.breath.update(dt);
+    _eggCam(eggGL,s,up,f,eye);
+    const nowT=performance.now()*0.001;
     for(const it of items){
+      if(!it.grp)continue;
       const rel=sub(it.p,eye),ahead=dot(rel,f),d=len(rel);
-      if(ahead<C.nearClip+Math.max(it.w,it.h)*.5||d>C.fogFar){
-        if(!it.off){it.off=true;it.el.style.visibility='hidden'}continue;
+      if(ahead<C.nearClip+140||d>C.fogFar){
+        if(!it.off){it.off=true;it.grp.visible=false}continue;
       }
-      if(it.off){it.off=false;it.el.style.visibility=''}
-      it.el.style.opacity=(1-clamp((d-C.fogNear)/(C.fogFar-C.fogNear),0,1)).toFixed(3);
+      if(it.off){it.off=false;it.grp.visible=true}
+      const eo=1-clamp((d-C.fogNear)/(C.fogFar-C.fogNear),0,1);
       const gk=clamp((d-C.greyAt)/(C.greyGone-C.greyAt),0,1),g=Math.round(Math.pow(gk,C.greyPow)*50)/50;
-      if(g!==it.g){it.g=g;it.el.style.filter=`grayscale(${g})`}
-      it.el.style.transform=`translate3d(${it.p[0].toFixed(1)}px,${it.p[1].toFixed(1)}px,${it.p[2].toFixed(1)}px) ${rot}`;
+      for(const e of it.mats){e.m.opacity=eo;e.m.color.setRGB(e.base.r+(e.lum-e.base.r)*g,e.base.g+(e.lum-e.base.g)*g,e.base.b+(e.lum-e.base.b)*g);}
+      _eggAim(eggGL,it,nowT,gotX,gotY,wantX,wantY);
+    }
+    const D0=eggGL.drg;
+    if(D0){
+      // follows the cursor (screen-space), always aims forward down the path
+      const td=320+Math.sin(nowT*0.5)*40,D=td+525;
+      const w2=(sc.clientWidth||2)/2,h2=(sc.clientHeight||2)/2;
+      const wX=gotX*w2*D/525*0.85+Math.sin(nowT*0.7)*20,wY=-gotY*h2*D/525*0.85+Math.cos(nowT*0.9)*14;
+      const tx=eye[0]+f[0]*td+s[0]*wX+up[0]*wY,ty=eye[1]+f[1]*td+s[1]*wX+up[1]*wY,tz=eye[2]+f[2]*td+s[2]*wX+up[2]*wY;
+      eggGL.basis={eye:eye,f:f,s:s,up:up,w2:w2,h2:h2,D:D};
+      if(!eggGL.breath&&window.__makeFireBreath)eggGL.breath=window.__makeFireBreath(T3,eggGL.scene,{n:64,size0:55,size1:340,speed:1500,spread:0.32,life:[0.6,1.0],lightD:6000,lightI:6e6,rate:80,cool:0.9});
+      if(!D0.init){D0.pos.set(tx,ty,tz);D0.px=tx;D0.py=ty;D0.pz=tz;D0.init=true;}
+      const ddx=tx-D0.pos.x,ddy=ty-D0.pos.y,ddz=tz-D0.pos.z;
+      const ddist=Math.hypot(ddx,ddy,ddz);
+      const dk=1-Math.exp(-dt*(5+ddist/120)); // cruise smooth up close, sprint to catch up after a fast scroll
+      D0.pos.x+=ddx*dk;D0.pos.y+=ddy*dk;D0.pos.z+=ddz*dk;
+      // leash: never leave the frame — clamp back into view (snap ahead if left behind the camera)
+      eggGL.vv.copy(D0.pos).project(eggGL.cam);
+      if(eggGL.vv.z>1){D0.pos.set(tx,ty,tz);}
+      else{
+        const ldx=clamp(eggGL.vv.x,-0.85,0.85),ldy=clamp(eggGL.vv.y,-0.8,0.8);
+        if(ldx!==eggGL.vv.x||ldy!==eggGL.vv.y){eggGL.vv.x=ldx;eggGL.vv.y=ldy;eggGL.vv.unproject(eggGL.cam);D0.pos.copy(eggGL.vv);}
+      }
+      const ivx=(D0.pos.x-D0.px)/Math.max(dt,1e-3),ivy=(D0.pos.y-D0.py)/Math.max(dt,1e-3),ivz=(D0.pos.z-D0.pz)/Math.max(dt,1e-3);
+      D0.px=D0.pos.x;D0.py=D0.pos.y;D0.pz=D0.pos.z;
+      D0.root.position.copy(D0.pos);
+      const cvx=ivx*s[0]+ivy*s[1]+ivz*s[2],cvy=ivx*up[0]+ivy*up[1]+ivz*up[2];
+      eggGL.e.set(clamp(-cvy*0.0012,-0.3,0.3),Math.PI,clamp(-cvx*0.0015,-0.45,0.45));
+      eggGL.q2.setFromEuler(eggGL.e);
+      D0.root.quaternion.copy(eggGL.cam.quaternion).multiply(eggGL.q2);
+      const sp=Math.sqrt(ivx*ivx+ivy*ivy+ivz*ivz);
+      D0.mixer.update(dt*(0.75+Math.min(sp/300,6)*0.12));
+    }
+    eggGL.renderer.render(eggGL.scene,eggGL.cam);
     }
     drawMap();
   }};
+  ensureEggs().catch(e=>{window.__eggErr=String((e&&e.stack)||e).slice(0,500)}); // boot preload: three.js + all egg GLBs stream in while the user is still on hero/wheel/sphere
 })();
 
 /* ================= transitions =================
    Every transition is a pure function of its progress, so it plays
    backwards when the user scrolls back up. One per seam:
-   hero→wheel liquid · wheel→sphere iris · sphere→path sheet · path→outro pixel */
+   hero→wheel liquid · wheel→sphere iris · sphere→path sheet · path→outro burn */
 const $=id=>document.getElementById(id),dark=matchMedia('(prefers-color-scheme:dark)');
 const stage=$('stage'),pages=[...document.querySelectorAll('.scene')],px=$('px');
 const heroImage=document.querySelector('.hero-image'),stepEl=$('step'),rail=$('rail');
@@ -1733,9 +2152,9 @@ float surface(float x){float base=-.25+uP*(uOvershoot+.25);float b=uBasin*pow(ab
  float w=sin(x*6.2831853*uWaveFreq+uTime*uWaveSpeed)*uWaveAmp+sin(x*6.2831853*uWaveFreq*1.93-uTime*uWaveSpeed*.7)*uWaveAmp*.55;
  float n=(fbm(vec2(x*uSurfScale,uTime*uSurfSpeed),3)-.5)*2.*uSurfNoise;return base+b+w+n;}
 void main(){vec2 uv=vUv;float d=surface(uv.x)-uv.y;
- vec2 np=vec2(uv.x*uAspect,uv.y)*uEdgeScale;float n=fbm(np+vec2(0.,uTime*uEdgeDrift),4)-.5;
+ vec2 np=vec2(uv.x*uAspect,uv.y)*uEdgeScale;float n=fbm(np+vec2(0.,uTime*uEdgeDrift),3)-.5;
  float dn=d+n*uEdgeAmp*2.;float m=smoothstep(-uEdgeSoft,uEdgeSoft,dn);if(m<=.001){gl_FragColor=vec4(0.);return;}
- vec2 tp=vec2(uv.x*uAspect,uv.y);float t=fbm(tp*uTexScale,5);
+ vec2 tp=vec2(uv.x*uAspect,uv.y);float t=fbm(tp*uTexScale,4);
  float grit=fbm(tp*uTexScale*5.,3)*.68+vnoise(tp*uTexScale*21.)*.32;t=mix(t,grit,uTexGrit);
  t=clamp((t-.5)*uTexContrast+.5+uTexLift,0.,1.);t=pow(t,uTexGamma);vec3 col=mix(uDark,uLight,t);
  float crest=(1.-smoothstep(0.,max(uCrestWidth,1e-4),dn))*step(-uEdgeSoft,dn);col=mix(col,uCrest,clamp(crest*uCrestGain,0.,1.));
@@ -1753,9 +2172,34 @@ void main(){
  if(a<=.001)discard;vec3 col=mix(uFoot,uTop,clamp(vUv.y,0.,1.));gl_FragColor=vec4(col*a,a);}`;
 const inOutQuad=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 const liqEase=t=>{t=clamp(t,0,1);return 1-Math.pow(1-Math.pow(t,1.74),3.92)};
+const BURN_FRAG = [
+"precision highp float;varying vec2 vUv;",
+"uniform float uP,uTime,uAspect;uniform vec3 uEmber,uGold,uChar;",
+NOISE,
+"void main(){",
+"  vec2 uv = vUv;",
+"  float front = mix(-0.18, 1.18, uP);",
+"  float warp = fbm(vec2(uv.x * uAspect, uv.y) * 3.0 + vec2(0., -uTime * .06), 4) - .5;",
+"  float d = (uv.y - front) + warp * .38;",
+"  float band = .055;",
+"  float bandM = 1. - smoothstep(0., band, abs(d));",
+"  float fl = fbm(vec2(uv.x * uAspect * 2.2, uv.y * 4.0) + vec2(3.7, -uTime * .55), 4);",
+"  float fl2 = fbm(vec2(uv.x * uAspect * 5.0, uv.y * 9.0) + vec2(9.1, -uTime * 1.1), 3);",
+"  vec3 fire = mix(uEmber, uGold, clamp(fl * .7 + fl2 * .5, 0., 1.));",
+"  fire *= 1.2 + 2.4 * bandM;",
+"  float charA = smoothstep(-.4, -.03, d) * (1. - smoothstep(-.03, .02, d)) * .92;",
+"  float smokeA = (1. - smoothstep(band, .55, d)) * step(0., d) * .5;",
+"  float spark = step(.986, fract(sin(dot(floor(uv * vec2(uAspect, 1.) * 160.) + floor(uTime * 7.) * 17., vec2(12.9898, 78.233))) * 43758.5453));",
+"  spark *= smoothstep(.6, .05, d) * step(0., d);",
+"  vec3 col = fire * bandM + uChar * charA + vec3(.02, .01, .01) * smokeA + uGold * spark * 1.5;",
+"  float a = clamp(bandM + charA + smokeA + spark, 0., 1.);",
+"  if (a <= .002) { gl_FragColor = vec4(0.); return; }",
+"  gl_FragColor = vec4(col / max(a, 1e-3), a);",
+"}"].join("\n");
+const BURN = { uEmber: [1.0, .30, .06], uGold: [1.0, .78, .32], uChar: [.04, .02, .02] };
 const maskEase=(k,dur,tau)=>{const n=Math.max(1,dur)/tau;return(1-Math.exp(-k*n))/(1-Math.exp(-n))};
-let iris,liquid,sheet;
-try{iris=GL(IRIS_FRAG,false,1);liquid=GL(LIQ_FRAG,false,.85);sheet=GL(SHEET_FRAG,true,1)}catch(e){console.warn('WebGL transition failed:',e.message)}
+let iris,liquid,sheet,burn;
+try{iris=GL(IRIS_FRAG,false,1);liquid=GL(LIQ_FRAG,false,.55);sheet=GL(SHEET_FRAG,true,1);burn=GL(BURN_FRAG,false,.5)}catch(e){console.warn('WebGL transition failed:',e.message)}
 
 /* pixel wipe is DOM: stepped clip-path plus per-tile flicker */
 const COLS=12,P_DUR=1,P_FADE=.2,P_OVER=.3;let pxItems=[],pxKey='';
@@ -1772,13 +2216,16 @@ function buildPx(){
 }
 
 /* A = scene leaving, B = scene arriving. Cover with A showing, swap, clear onto B. */
-let A=0,B=-1,prevVis=[0],tU=0,sU=0,drawKey='',lastPair='',vidCache=null;
+let A=0,B=-1,prevVis=[0],tU=0,sU=0,drawKey='',lastPair='',vidCache=null,needDraw=false;
+window.__stage={a:0,b:-1};
+const wI=SCN.indexOf('wheel');let wfShown=null;
 function show(...v){
   if(v.includes(0)&&!prevVis.includes(0)){
     heroImage.style.animation='none';void heroImage.offsetWidth;heroImage.style.animation='';
   }
   prevVis=v;vis=v;
   pages.forEach((p,i)=>{p.classList.toggle('on',v.includes(i));p.style.clipPath='';p.style.zIndex=''});
+  {const wOn=v.includes(wI);if(wfShown!==wOn){wfShown=wOn;const wf=document.getElementById('wv-f');if(wf)wf.style.visibility=wOn?'visible':'hidden'}}
   if(!vidCache)vidCache=pages.map(p=>[...p.querySelectorAll('video')]);
   pages.forEach((p,i)=>{const on=v.includes(i);for(const vd of vidCache[i]){if(on){if(vd.paused)vd.play().catch(()=>{})}else if(!vd.paused)vd.pause()}});
 }
@@ -1789,30 +2236,52 @@ const FX={
     return{uRes:[iris.c.width,iris.c.height],uT:T,uTime:clock(),uPixel:Math.max(1,dpr()),uNoiseScale:2.2,uNoiseAmp:.9,uNoiseSpeed:0,uSteep:12.5,uClose:2,uOpen:15,uGlowWidth:1,uGlowGain:5,uDark:.015,uBright:2.35,uPulse:0,uBorder:hex('#2E6BFF'),uGround:hex(dark.matches?'#000000':'#ffffff')}})},
   sheet(u){gl2(sheet,u,1404/3823,(ph,k)=>{const w=sheet.c.width,h=sheet.c.height,dk=dark.matches;
     return{uP:ph?.36+.64*maskEase(k,2419,500):maskEase(k,1404,500),uOut:ph?1:0,uTime:clock(),uAxis:0,uFlip:0,uAspect:w/h,uDispAmp:.175,uDispScale:12.2,uDispDrift:0,uSoft:.001,uLens:-.275,uDetail:5,uTop:hex(dk?'#2a2a2a':'#EFEFEF'),uFoot:hex(dk?'#0b0b0b':'#FFFFFF')}})},
+  burn(u){gl2(burn,u,.5,(ph,k)=>Object.assign({uP:u,uTime:clock(),uAspect:burn.c.width/Math.max(1,burn.c.height)},BURN))},
   pixel(u){buildPx();show(A,B);px.classList.add('on');const t=u*P_DUR;
     for(const p of pxItems)p.e.style.opacity=clamp((t-p.a)/p.pd,0,1)-clamp((t-p.b)/p.pd,0,1);
     const cs=Math.min(P_FADE,P_DUR*.5);let s=0;if(t>=cs)s=Math.ceil(clamp((t-cs)/(P_DUR-2*cs),0,1)*COLS)/COLS;
     const x=s*100;pages[B].style.zIndex=1;pages[B].style.clipPath=`polygon(0% 0%,${x}% 0%,${x}% 100%,0% 100%)`}
 };
 
-/* scroll map — hero | liquid | wheel | iris | sphere | sheet | path | pixel | outro */
-const SEG=[[.08,.26],[.32,.50],[.54,.72],[.76,.94]];
-const FXS=[FX.liquid,FX.iris,FX.sheet,FX.pixel];
+/* scroll map — hero | liquid | wheel | iris | sphere | sheet | path | burn | outro */
+const SEG=[[.06,.16],[.30,.40],[.54,.64],[.76,.86]];
+const FXS=[FX.liquid,FX.iris,FX.sheet,FX.burn];
 const STEPS=SCN.length;
 function update(){
   const p=clamp(scrollY/Math.max(1,document.documentElement.scrollHeight-innerHeight),0,1);
   let a=STEPS-1,b=-1,u=0;
   for(let i=0;i<SEG.length;i++){const s=SEG[i][0],e=SEG[i][1];if(p<s){a=i;break}if(p<e){a=i;b=i+1;u=(p-s)/(e-s);break}}
   A=a;B=b;tU=u;
-  if(a+','+b!==lastPair){lastPair=a+','+b;sU=tU;drawKey=''}
-  if(b<0){glfx.forEach(g=>g.c.classList.remove('on'));px.classList.remove('on');const k='s'+a;if(drawKey!==k){drawKey=k;show(a)}}
+  window.__stage.a=a;window.__stage.b=b;window.__stage.u=u;
+  if(a+','+b!==lastPair){lastPair=a+','+b;sU=tU;drawKey='';needDraw=true}
+  if(b<0){glfx.forEach(g=>g.c.classList.remove('on'));px.classList.remove('on');const k='s'+a;if(drawKey!==k){drawKey=k;show(a)}}else{needDraw=true}
   stepEl.textContent=String((b<0?a:b)+1).padStart(2,'0')+' / '+String(STEPS).padStart(2,'0');
   rail.style.transform=`scaleX(${p.toFixed(4)})`;
 }
 let lastY=scrollY;
 addEventListener('scroll',()=>{
-  update();const d=clamp(scrollY-lastY,-400,400);lastY=scrollY;
+  update();
+  const hp=(window.__D&&window.__D.hoop)||'off';
+  if(hp==='fly'||hp==='rise'){ // gate: no next scene until the skeleton parks
+    const maxY=Math.max(1,document.documentElement.scrollHeight-innerHeight),capY=maxY*0.29; // wheel dwell end (.30): gate pins here through the hoop moment
+    if(scrollY>capY+2){scrollTo(0,capY);lastY=capY;update();return;}
+  }
+  const d=clamp(scrollY-lastY,-400,400);lastY=scrollY;
   for(const i of vis){const s=scenes[SCN[i]];if(s&&s.push)s.push(d)}
+},{passive:true});
+/* click/tap (not drag) = dragon breathes fire. Routed by scroll stage: hero/wheel
+   scenes fire the skeleton's dragon, the path scene fires the egg-field dragon. */
+let _firePd=null;
+addEventListener('pointerdown',e=>{_firePd={x:e.clientX,y:e.clientY,t:performance.now()};},{passive:true});
+addEventListener('pointerup',e=>{
+  if(!_firePd)return;
+  const dx=e.clientX-_firePd.x,dy=e.clientY-_firePd.y,held=performance.now()-_firePd.t;_firePd=null;
+  if(dx*dx+dy*dy>64||held>500)return;
+  if(e.target&&e.target.closest&&e.target.closest('button,a,input,textarea,select'))return;
+  const nx=(e.clientX/Math.max(1,innerWidth)-.5)*2,ny=(e.clientY/Math.max(1,innerHeight)-.5)*2;
+  const st=window.__stage||{a:0,b:-1};
+  if((st.a<=1||(st.b>=0&&st.b<=1))&&window.__heroFire)window.__heroFire();
+  if((st.a===3||st.b===3)&&window.__eggFire)window.__eggFire(nx,ny);
 },{passive:true});
 $('top').addEventListener('click',()=>scrollTo({top:0,behavior:'smooth'}));
 new ResizeObserver(()=>{
@@ -1821,6 +2290,61 @@ new ResizeObserver(()=>{
   update();
 }).observe(stage);
 update();requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* --- OUTRO lava field (inferno orb, dragon-catcher dressed) --- */
+(()=>{
+const cv=document.getElementById('lavac');
+const gl=cv.getContext('webgl',{antialias:false,powerPreference:'high-performance'});
+if(!gl)return;
+const VERT="attribute vec2 a;void main(){gl_Position=vec4(a,0,1);}";
+const FRAG=[
+"precision highp float;",
+"uniform vec3 iRes;uniform float iT;uniform vec4 iM;",
+"const float dV=.7,dO=.5,sR=.6;const vec3 ld=vec3(1,1,.5);",
+"float hash(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,79.1)))*43758.5453);}",
+"vec3 rY(vec3 v,float t){float c=cos(t),s=sin(t);return vec3(v.x*c+v.z*s,v.y,-v.x*s+v.z*c);}",
+"vec3 rX(vec3 v,float t){float c=cos(t),s=sin(t);return vec3(v.x,v.y*c-v.z*s,v.y*s+v.z*c);}",
+"float noise(in vec3 p){vec3 i=floor(p),f=fract(p),u=f*f*f*(f*(f*6.-15.)+10.);float v=mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),u.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),u.x),u.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),u.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),u.x),u.y),u.z);v=v*2.-.5;float cv=abs(cos(v)),sv=abs(sin(v));return mix(sv,cv,sv);}",
+"float nL(vec3 p){float f=2.92,v=0.,s=0.;for(int i=0;i<11;i++){float w=1./pow(f,1.);v+=noise(p*f)*w;s+=w;f*=1.3;}return v/s;}",
+"float map(vec3 p){vec2 nm=(iM.xy/iRes.xy)*2.-1.;p=rX(p,nm.y*.6+iT/7.);p=rY(p,nm.x*.6+iT/7.);return nL(p+iT/70.)-dO;}",
+"vec3 calcN(in vec3 pos,float t){vec2 e=vec2(.0005*t,0.);return normalize(vec3(map(pos+e.xyy)-map(pos-e.xyy),map(pos+e.yxy)-map(pos-e.yxy),map(pos+e.yyx)-map(pos-e.yyx)));}",
+"float shRay(vec3 sp,vec3 ld2){float t=0.,sh=40.,mn=1.;for(int r=0;r<8;r++){vec3 p=sp+t*ld2+normalize(sp)/sh;vec3 pp=normalize(p)*sR;float d=length(p)-(sR+map(pp)*dV);mn=min(mn,d);if(d<0.)break;t+=.01;}return smoothstep(0.,2.,mn*sh);}",
+"vec3 sky(vec2 uv,float mn){float s1=((1.-nL(vec3(uv*100.+iT/10.,0.)))*10.-8.);float s2=((1.-nL(vec3(uv*30.+iT/20.,3.)))*10.-8.8);vec3 s=max(0.,s1)*vec3(.2,.5,.6)+max(0.,s2)*vec3(1.,.8,.5);s*=(0.-length(uv*.07))*2.;s+=pow(1.-mn,1.)*.2*vec3(1.,.1,.1);return s;}",
+"void main(){vec2 fc=gl_FragCoord.xy;vec2 uv=fc*2./iRes.xy-1.;uv.x*=iRes.x/iRes.y;vec3 col=sky(uv,0.);float mn=1.,t=0.;for(int r=0;r<64;r++){vec3 p=vec3(uv,-1.+t);vec3 pp=normalize(p)*sR;float d=length(p)-(sR+map(pp)*dV);mn=min(mn,d);if(d<.01){float rc=float(r)/64.;vec3 n=mix(calcN(pp,.1),calcN(pp,10.),.5);float l1=max(dot(n,-ld),0.)*1.2;if(l1>.21)l1*=shRay(p,ld);l1+=pow(l1,15.)/100.;col=vec3(.4,.5,.6)*l1;col+=max(dot(n,vec3(0,.5,1)),0.)*.15*vec3(.4,.5,.7);col+=vec3(2.,.35,.15)*pow(max(0.,-map(pp)+.2),3.)*58.*max(0.,1.-n.z);col+=pow(rc,5.)*vec3(1.,.85,.2);break;}else if(t>4.){col=sky(uv,mn);break;}t+=d;}gl_FragColor=vec4(col,1.);}"
+].join("\n");
+const mk=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o;};
+const pg=gl.createProgram();
+gl.attachShader(pg,mk(gl.VERTEX_SHADER,VERT));gl.attachShader(pg,mk(gl.FRAGMENT_SHADER,FRAG));
+gl.linkProgram(pg);gl.useProgram(pg);
+if(!gl.getProgramParameter(pg,gl.LINK_STATUS)){console.warn("lava link failed:",gl.getProgramInfoLog(pg));return;}
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+const al=gl.getAttribLocation(pg,"a");gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+const uRes=gl.getUniformLocation(pg,"iRes"),uT=gl.getUniformLocation(pg,"iT"),uM=gl.getUniformLocation(pg,"iM");
+const sc=document.getElementById('s-outro');
+const mob=()=>Math.min(innerWidth,innerHeight)<700;
+let SCALE=.55,rawX=0,rawY=0;
+function resize(){SCALE=mob()?.42:.55;const r=sc.getBoundingClientRect();const w=Math.max(2,Math.round(r.width*SCALE)),h=Math.max(2,Math.round(r.height*SCALE));cv.width=w;cv.height=h;gl.viewport(0,0,w,h);rawX=w*.5;rawY=h*.5;}
+addEventListener('resize',resize);resize();
+addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect();rawX=(e.clientX-r.left)/Math.max(1,r.width)*cv.width;rawY=(1-(e.clientY-r.top)/Math.max(1,r.height))*cv.height;},{passive:true});
+const T0=performance.now();let prev=T0,smX=0,smY=0;
+window.__lava={gl,canvas:cv};
+function frame(now){
+  requestAnimationFrame(frame);
+  if(!sc.classList.contains('on')){prev=now;return;}
+  {const ew=Math.max(2,Math.round(sc.clientWidth*SCALE)),eh=Math.max(2,Math.round(sc.clientHeight*SCALE));if(ew!==cv.width||eh!==cv.height){cv.width=ew;cv.height=eh;gl.viewport(0,0,ew,eh);}} // fit on reveal: the burn + videos already eat enough GPU
+  const dt=Math.min((now-prev)*.001,.1);prev=now;
+  const t=(now-T0)*.001;
+  const a=1-Math.pow(0.93,dt*60);smX+=(rawX-smX)*a;smY+=(rawY-smY)*a;
+  gl.uniform3f(uRes,cv.width,cv.height,1);gl.uniform1f(uT,t);gl.uniform4f(uM,smX,smY,0,0);
+  gl.drawArrays(gl.TRIANGLES,0,6);
+  if(window.__lavaShot){window.__lavaResult=cv.toDataURL();window.__lavaShot=false;}
+}
+requestAnimationFrame(frame);
+document.querySelector('.lv-left').addEventListener('click',()=>{scrollTo({top:document.body.scrollHeight*.70,behavior:'smooth'})});
+document.querySelector('.lv-right').addEventListener('click',()=>{scrollTo({top:0,behavior:'smooth'})});
 })();
 </script>
 </body>
