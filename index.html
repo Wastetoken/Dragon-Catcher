@@ -89,6 +89,26 @@
     #map { display: none; }
     #map canvas { width: 100%; height: 100%; display: block; }
 
+    /* ── Guild scene (homunculus member list; replaces the sphere) ── */
+    #s-sphere { background: #0f0f0f; color: #fff; }
+    #homc { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .g-lines { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+    .g-lines i { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,.14); display: block; }
+    .g-menu { position: absolute; top: 20px; right: 22px; z-index: 5; color: rgba(255,255,255,.7); font: 12px Arial, sans-serif; letter-spacing: .08em; pointer-events: none; }
+    .g-ui { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: flex; justify-content: center; align-items: flex-start; padding-top: 11vh; }
+    .g-title { font-family: 'Arial Black', Arial, sans-serif; font-weight: 900; color: #fff; letter-spacing: .18em; text-align: center; line-height: 1.2; text-transform: uppercase; user-select: none; font-size: clamp(2rem,6vw,5.5rem); }
+    .g-title small { display: block; font-size: .3em; letter-spacing: .5em; margin-top: 1em; opacity: .6; font-weight: 400; }
+    .g-paper { position: absolute; inset: 0; z-index: 5; background-image: url('https://pub-087e5ee564ec42269b33b2653627e3e9.r2.dev/paper.png'); background-size: cover; mix-blend-mode: difference; opacity: .2; pointer-events: none; }
+    .g-hint { position: absolute; right: 16px; bottom: 14px; z-index: 5; color: #fff; font: 11px Arial, sans-serif; letter-spacing: .2em; opacity: .5; pointer-events: none; }
+    /* ── LENS viewer: watermark-free rebuild of the ShaderLab magnify-lens comp ── */
+    #lens { position: absolute; inset: 0; z-index: 8; cursor: crosshair; background: #060606; }
+    #lensc { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .lens-tag { position: absolute; top: 18px; left: 20px; z-index: 2; color: rgba(255,255,255,.82); font: 11px ui-monospace, Menlo, monospace; letter-spacing: .22em; text-transform: uppercase; pointer-events: none; }
+    .lens-tag small { display: block; margin-top: 6px; opacity: .5; letter-spacing: .18em; }
+    #lensX { position: absolute; top: 14px; right: 16px; z-index: 3; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.35); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1; }
+    #lensX:hover { background: #e8c85a; border-color: #e8c85a; color: #000; }
+    .lens-hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; z-index: 2; color: rgba(255,255,255,.45); font: 10px ui-monospace, Menlo, monospace; letter-spacing: .28em; text-transform: uppercase; pointer-events: none; }
+
     #pg { perspective: 525px; perspective-origin: 50% 50%; }
     #world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
     .it { position: absolute; overflow: hidden; background: #888; }
@@ -261,10 +281,21 @@
         <div id="peek"><div class="pf" id="pf"></div><div class="pm"><span id="pn">—</span><span id="py">—</span></div></div>
     </section>
 
-    <!-- 3 · SPHERE -->
+    <!-- 3 · GUILD (homunculus member list; was sphere) -->
     <section class="scene" id="s-sphere">
-        <div class="vp" id="sv"><div class="stage" id="ss"></div></div>
-        <div class="hint">Sphere · drag to orbit, scroll to dolly, pinch on touch</div>
+        <canvas id="homc"></canvas>
+        <div id="lens" hidden>
+            <canvas id="lensc"></canvas>
+            <div class="lens-tag" id="lensLabel">Abaddon &middot; Lord of Decay<small>magnify lens &middot; move to inspect</small></div>
+            <button id="lensX" aria-label="close">&times;</button>
+            <div class="lens-hint">esc to close</div>
+        </div>
+        <div class="g-lines"><i style="left:50%"></i><i style="left:30%"></i><i style="left:70%"></i><i style="left:10%"></i><i style="left:90%"></i></div>
+        <div class="g-paper"></div>
+        <div class="g-menu">GUILDED MEMBERS ONLY</div>
+        <div class="g-ui"><div class="g-title" id="g-title">Guild Members<br><small>&darr; this way &darr;</small></div></div>
+        <div class="g-hint">scroll</div>
+        <div class="hint">Guild &middot; scroll to descend &middot; tap a portrait to inspect &middot; your slot to enter</div>
     </section>
 
     <!-- 4 · PATH -->
@@ -1286,7 +1317,7 @@ const clock = new THREE.Clock();
 /* ---- FIRE BREATH: click/tap to breathe. Ring-sheet flames (ref: TheriaC_4_ strip),
    additive sprites so the black sheet background drops out. Factory is shared:
    the egg scene instantiates its own copy via window.__makeFireBreath. ---- */
-const FIRE_URL='https://user.uploads.dev/file/b4707b504c653bf9590578a86babbc57.png';
+const FIRE_URL='https://user.uploads.dev/file/f5d9e75e7d3c404a966d168b29e7af76.png';
 const FIRE_N=9;
 let __whooshAC=null;
 window.__whoosh=function(big){
@@ -1320,7 +1351,8 @@ window.__makeFireBreath=function(TH, scene, o){
     if(pendingAim){const a=pendingAim;pendingAim=null;api.trigger(a);}
   });
   function mk(){
-    const tm=new TH.SpriteMaterial({blending:TH.AdditiveBlending,depthWrite:false,transparent:true,opacity:0});
+    // normal blending + true-alpha sheet (additive black quads rendered opaque on some setups — never again)
+    const tm=new TH.SpriteMaterial({depthWrite:false,transparent:true,opacity:0,alphaTest:0.02});
     const sp=new TH.Sprite(tm); sp.visible=false; scene.add(sp);
     const p={sp,age:1,life:1,vx:0,vy:0,vz:0,s0:1,s1:2,spin:0,
       onTex(){ if(!tex||tm.map)return; tm.map=tex.clone(); tm.map.repeat.set(1/FIRE_N,1); tm.map.needsUpdate=true; }};
@@ -1343,7 +1375,7 @@ window.__makeFireBreath=function(TH, scene, o){
       p.s0=P.size0*(0.7+Math.random()*0.6); p.s1=P.size1*(0.8+Math.random()*0.5);
       p.spin=(Math.random()-0.5)*6;
       p.sp.material.rotation=Math.random()*Math.PI*2;
-      p.sp.material.color.setHex(P.tint).offsetHSL((Math.random()-0.5)*0.03,0,(Math.random()-0.5)*0.08);
+      p.sp.material.color.setHex(P.tint).offsetHSL((Math.random()-0.5)*0.03,0,(Math.random()-0.5)*0.08).multiplyScalar(1.35);
       p.onTex();
       light.position.copy(mouth);
       return;
@@ -1391,6 +1423,7 @@ window.__heroFire=function(){
   });
 };
 window.__D.fbStat=()=>heroBreath.stat();
+window.__heroShot=()=>{const D=window.__D;D.renderer.render(D.scene,D.camera);return D.renderer.domElement.toDataURL();};
 const MOUSE_ALPHA60 = 1.0;
 
 const _vertCache = {};
@@ -1647,7 +1680,6 @@ const WHL_BASE='https://pub-f572708a1ee44ad59ed71188a84ec48b.r2.dev/';
 const WHL_FILES=["1.svg","2.svg","3.svg","4.svg","5.svg","6.svg","7.svg","8.svg","9.svg","10.svg","11.svg","12.svg","13.svg","14.svg","15.svg","16.svg","17.svg","18.svg","19.svg","20.svg","21.svg"];
 const WHL_SRC=WHL_FILES.map(f=>WHL_BASE+f);
 function whlEl(i){const m=document.createElement('img');m.src=WHL_SRC[i%WHL_SRC.length];m.alt=WHL_FILES[i%WHL_FILES.length];m.draggable=false;m.onerror=()=>{const n=+(m.dataset.n||0)+1;m.dataset.n=n;if(n>WHL_SRC.length+1)return;m.src=WHL_SRC[(n===1?i:i+n-1)%WHL_SRC.length];};return m}
-function sphEl(i){const m=document.createElement('img');m.src=SPH_SRC[i%SPH_SRC.length];m.alt=SPH_FILES[i%SPH_FILES.length];m.draggable=false;m.onerror=()=>{const n=+(m.dataset.n||0)+1;m.dataset.n=n;if(n>SPH_SRC.length+1)return;m.src=SPH_SRC[(n===1?i:i+n-1)%SPH_SRC.length];};return m}
 function sourceIdx(i){const n=SRC.length;let s=Math.max(2,Math.round(n*.618));while(gcd(s,n)!==1)s++;return (i*s)%n}
 function mediaEl(k){
   if(ISVID[k]){
@@ -1751,72 +1783,353 @@ scenes.wheel=(()=>{
 
 /* ================= SPHERE ================= */
 scenes.sphere=(()=>{
-  const C={count:20,maxR:430,minR:150,rv:.43,spacing:.29,asp:1.28,fit:1.05,persp:1400,drag:.07,ease:.25,idle:.075,zoomStep:3,zoomMin:-360,maxNear:13.5,zoomEase:.17,introMs:1800,introFrom:.02,introTurn:140};
-  const sc=document.getElementById('s-sphere'),vp=document.getElementById('sv'),st=document.getElementById('ss');
-  vp.style.perspective=C.persp+'px';
-  const D=Math.PI/180,GA=Math.PI*(3-Math.sqrt(5));
-  const mMul=(a,b)=>{const o=[];for(let r=0;r<3;r++)for(let c=0;c<3;c++)o[r*3+c]=a[r*3]*b[c]+a[r*3+1]*b[3+c]+a[r*3+2]*b[6+c];return o};
-  const rx=a=>{const s=Math.sin(a),c=Math.cos(a);return[1,0,0,0,c,-s,0,s,c]};
-  const ry=a=>{const s=Math.sin(a),c=Math.cos(a);return[c,0,s,0,1,0,-s,0,c]};
-  function ortho(m){
-    let x=[m[0],m[3],m[6]],y=[m[1],m[4],m[7]];
-    const nx=Math.hypot(...x);x=x.map(v=>v/nx);
-    const d=x[0]*y[0]+x[1]*y[1]+x[2]*y[2];y=[y[0]-d*x[0],y[1]-d*x[1],y[2]-d*x[2]];
-    const ny=Math.hypot(...y);y=y.map(v=>v/ny);
-    const z=[x[1]*y[2]-x[2]*y[1],x[2]*y[0]-x[0]*y[2],x[0]*y[1]-x[1]*y[0]];
-    return[x[0],y[0],z[0],x[1],y[1],z[1],x[2],y[2],z[2]];
+  // GUILD ENTRANCE — homunculus member list (replaces the demon sphere; iris-in / sheet-out unchanged).
+  // 20 portraits stream in, then a 21st RESERVED slot (the viewer's preserved place) pulses;
+  // clicking it scrolls on into the path scene. Scroll drive comes from stage progress, not window scroll.
+  const sc=document.getElementById('s-sphere');
+  const URLS=SPH_SRC, COLS=3, ROWS=Math.ceil(URLS.length/COLS), CELLS=URLS.length+1;
+  const noiseVtx=`
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+  const noiseFrg=`
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+    const vec2 C=vec2(1.0/6.0,1.0/3.0);
+    const vec4 D=vec4(0.0,0.5,1.0,2.0);
+    vec3 i=floor(v+dot(v,C.yyy));
+    vec3 x0=v-i+dot(i,C.xxx);
+    vec3 g=step(x0.yzx,x0.xyz);
+    vec3 l=1.0-g;
+    vec3 i1=min(g.xyz,l.zxy);
+    vec3 i2=max(g.xyz,l.zxy);
+    vec3 x1=x0-i1+C.xxx;
+    vec3 x2=x0-i2+C.yyy;
+    vec3 x3=x0-D.yyy;
+    i=mod289(i);
+    vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+    float n_=0.142857142857;
+    vec3 ns=n_*D.wyz-D.xzx;
+    vec4 j=p-49.0*floor(p*ns.z*ns.z);
+    vec4 x_=floor(j*ns.z);
+    vec4 y_=floor(j-7.0*x_);
+    vec4 x=x_*ns.x+ns.yyyy;
+    vec4 y=y_*ns.x+ns.yyyy;
+    vec4 h=1.0-abs(x)-abs(y);
+    vec4 b0=vec4(x.xy,y.xy);
+    vec4 b1=vec4(x.zw,y.zw);
+    vec4 s0=floor(b0)*2.0+1.0;
+    vec4 s1=floor(b1)*2.0+1.0;
+    vec4 sh=-step(h,vec4(0.0));
+    vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
+    vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+    vec3 p0=vec3(a0.xy,h.x);
+    vec3 p1=vec3(a0.zw,h.y);
+    vec3 p2=vec3(a1.xy,h.z);
+    vec3 p3=vec3(a1.zw,h.w);
+    vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+    p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+    vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
+    m=m*m;
+    return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+uniform float cr;
+uniform float cg;
+uniform float cb;
+varying vec2 vUv;
+void main(){
+    float v=snoise(vec3(cr*vUv.x,cg*vUv.y,cb));
+    gl_FragColor=vec4(v,v,v,1.0);
+}`;
+  const mouseVtx=`
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+  const mouseFrg=`
+uniform sampler2D uPrev;
+uniform vec2 uMouse;
+uniform float uDecay;
+varying vec2 vUv;
+void main(){
+    vec4 prev=texture2D(uPrev,vUv);
+    float d=length(vUv-uMouse);
+    float spot=smoothstep(0.10,0.0,d);
+    float val=clamp(prev.r*uDecay+spot,0.0,1.0);
+    gl_FragColor=vec4(val,val,val,1.0);
+}`;
+  const thumbVtx=`
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+  const thumbFrg=`
+uniform sampler2D uTex;
+varying vec2 vUv;
+void main() {
+    gl_FragColor = texture2D(uTex, vUv);
+}`;
+  const displayVtx=`
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+  const displayFrg=`
+uniform sampler2D uScene;
+uniform sampler2D uMouse;
+uniform sampler2D uNoise;
+uniform float time;
+uniform float ease;
+uniform float alpha;
+uniform float meEase;
+uniform float mfBlack;
+uniform float distA;
+uniform float distB;
+varying vec2 vUv;
+
+void main(){
+    vec3 noiseC=texture2D(uNoise,vec2(vUv.x*0.3,vUv.y*0.3)).rgb;
+
+    vec2 ppp=-1.0+2.0*vUv;
+    float wscale=1.6;
+
+    ppp+=0.1*cos((1.5*wscale)*ppp.yx+1.1*time+vec2(0.1,1.1));
+    ppp+=0.1*cos((2.3*wscale)*ppp.yx+1.3*time+vec2(3.2,3.4));
+    ppp+=0.1*cos((2.2*wscale)*ppp.yx+1.7*time+vec2(1.8,5.2));
+    ppp+=distA*cos((distB*wscale)*ppp.yx+1.4*time+vec2(6.3,3.9));
+
+    float r=length(ppp);
+
+    float vx=(vUv.x*ease)+(r*(1.0-ease));
+    float vy=(vUv.y*ease)+(r*(1.0-ease)*0.5);
+
+    vec4 mfColor=texture2D(uMouse,vUv);
+    float mfSin=sin(mfColor.r*3.14159);
+
+    // Mouse distortion and masking decay completely at the settled state.
+    float mouseInfluence=meEase*(1.0-ease);
+    vec2 effectUv=vec2(vx,vy)+mouseInfluence*vec2(mfSin,mfSin);
+
+    vec4 col=texture2D(uScene,effectUv);
+
+    float aa=col.a*alpha-(noiseC.r*0.5*(1.0-ease));
+    float mouseMask=mfBlack*(1.0-ease);
+
+    gl_FragColor=vec4(
+        col.rgb,
+        clamp(aa,0.0,1.0)*(1.0-mfColor.r*mouseMask)
+    );
+}`;
+  let T=null, live=false;
+  let renderer,noiseRT,noiseScene,noiseCam,noiseMat,mouseRTA,mouseRTB,mouseScene,mouseCam,mouseMat,mouseUV;
+  let dummyRT,dummyScene,dummyCam,backgroundMesh,enterTex,fallbackTexture;
+  let mainScene,mainCam,displayMat,displayMesh,titleEl;
+  let loader,textures,doneFlags,finishedCount,failedCount,gridBuilt;
+  let W=2,H=2,GAP_X=0,CELL_W=0,MAX_IMAGE_H=0,GAP_Y=0,galleryHeight=800,thumbMeshes=[],enterMat=null;
+  let easeTarget=0,alphaTarget=0.9,scrollSmooth=0,ease=0,alpha=0.9,time=0,noiseCb=0;
+  window.__guild=()=>({ready:gridBuilt,live,failed:failedCount||0});
+  window.__guildShot=()=>{step(0.016,performance.now());return renderer.domElement.toDataURL();};
+  window.__abRect=()=>{if(!gridBuilt||!thumbMeshes[0])return null;const m=thumbMeshes[0],pr=m.geometry.parameters;return{x:m.position.x+W/2,y:H/2-m.position.y,w:pr.width,h:pr.height};};
+  window.__abSrc=()=>SPH_SRC[0];
+  window.__cardHit=(cx,cy)=>{if(!gridBuilt)return -1;for(let i=0;i<URLS.length;i++){const m=thumbMeshes[i];if(!m)continue;const pr=m.geometry.parameters;const x=m.position.x+W/2,y=H/2-m.position.y;if(Math.abs(cx-x)<pr.width/2+24&&Math.abs(cy-y)<pr.height/2+24)return i;}return -1;};
+  window.__cardSrc=(i)=>SPH_SRC[i]||'';
+  function dims(){
+    W=Math.max(2,sc.clientWidth||innerWidth);H=Math.max(2,sc.clientHeight||innerHeight);
+    GAP_X=W/COLS;CELL_W=GAP_X*0.82;
+    MAX_IMAGE_H=Math.min(CELL_W*1.45,H*0.58);
+    GAP_Y=MAX_IMAGE_H*1.22;
+    galleryHeight=MAX_IMAGE_H+(ROWS-1)*GAP_Y;
   }
-  const items=[],pos=[];let radius,restZoom,zoomMaxRel,iw,ih;
-  function measure(){
-    const fit=Math.min(innerWidth,innerHeight);
-    radius=clamp(fit*C.rv,C.minR,C.maxR);
-    const spacing=radius*Math.sqrt(4*Math.PI/C.count);
-    iw=spacing*C.spacing/Math.hypot(1,C.asp);ih=iw*C.asp;
-    const P=C.persp;
-    restZoom=P-2*radius*P/(C.fit*fit);
-    zoomMaxRel=(P-P/C.maxNear-radius)-restZoom;
+  function fittedSize(texture){
+    const image=texture.image||{};
+    const iw=image.naturalWidth||image.width||1,ih=image.naturalHeight||image.height||1;
+    const aspect=iw/ih;
+    let width=CELL_W,height=width/aspect;
+    if(height>MAX_IMAGE_H){height=MAX_IMAGE_H;width=height*aspect;}
+    return{width,height};
   }
-  function layout(){
-    pos.length=0;
-    for(let i=0;i<C.count;i++){
-      const yy=1-(2*i+1)/C.count,lat=Math.asin(clamp(yy,-1,1)),lon=i*GA;
-      pos.push([radius*Math.cos(lat)*Math.sin(lon),-radius*Math.sin(lat),radius*Math.cos(lat)*Math.cos(lon)]);
-      items[i].style.width=iw+'px';items[i].style.height=ih+'px';
+  function disposeGrid(){
+    for(const mesh of thumbMeshes){dummyScene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}
+    thumbMeshes=[];enterMat=null;
+  }
+  function buildGrid(){
+    disposeGrid();dims();
+    for(let i=0;i<CELLS;i++){
+      let mesh;
+      if(i<URLS.length){
+        const texture=textures[i]||fallbackTexture;
+        const size=fittedSize(texture);
+        mesh=new T.Mesh(new T.PlaneGeometry(size.width,size.height),
+          new T.ShaderMaterial({vertexShader:thumbVtx,fragmentShader:thumbFrg,uniforms:{uTex:{value:texture}},depthWrite:true}));
+      }else{
+        // the viewer's preserved slot: gold reserved card, pulses; click it to move on
+        enterMat=new T.MeshBasicMaterial({map:enterTex,transparent:true,depthWrite:false});
+        const h=Math.min(CELL_W*1.375,MAX_IMAGE_H);
+        mesh=new T.Mesh(new T.PlaneGeometry(CELL_W,h),enterMat);
+      }
+      const col=i%COLS,row=Math.floor(i/COLS);
+      mesh.position.x=(col-(COLS-1)/2)*GAP_X;
+      mesh.position.y=H/2-MAX_IMAGE_H/2-row*GAP_Y;
+      mesh.position.z=0;
+      dummyScene.add(mesh);thumbMeshes.push(mesh);
     }
+    gridBuilt=true;
+    console.info(`Guild ready: ${URLS.length} portraits + your slot, ${ROWS} rows, ${failedCount} failed loads.`);
   }
-  for(let i=0;i<C.count;i++){const e=card('card',i);e.replaceChildren(sphEl(i));e.dataset.k=i;st.appendChild(e);items.push(e)}
-  measure();layout();
-  let rot=mMul(rx(-6*D),[1,0,0,0,1,0,0,0,1]),px=0,py=0,zoom=restZoom,tz=restZoom,dragging=false,pid=null,lx=0,ly=0,fc=0;
-  const intro=ramp(C.introMs);let ik=0,ip=0;
-  sc.addEventListener('pointerdown',e=>{dragging=true;pid=e.pointerId;lx=e.clientX;ly=e.clientY;sc.classList.add('drag');sc.setPointerCapture(pid)});
-  sc.addEventListener('pointermove',e=>{
-    if(!dragging||e.pointerId!==pid)return;
-    py+=(e.clientX-lx)*C.drag;px-=(e.clientY-ly)*C.drag;lx=e.clientX;ly=e.clientY;
+  function settleImage(index,texture,success){
+    if(doneFlags[index])return;doneFlags[index]=true;
+    if(success){
+      texture.minFilter=T.LinearFilter;texture.magFilter=T.LinearFilter;
+      texture.wrapS=T.ClampToEdgeWrapping;texture.wrapT=T.ClampToEdgeWrapping;
+      texture.colorSpace=T.SRGBColorSpace;textures[index]=texture;
+    }else{failedCount++;textures[index]=fallbackTexture;console.error('Guild image failed:',URLS[index]);}
+    finishedCount++;
+    if(finishedCount===URLS.length&&!gridBuilt){gridBuilt=true;buildGrid();}
+  }
+  function mkRT(w,h){return new T.WebGLRenderTarget(w,h,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:false,stencilBuffer:false});}
+  function sizeAll(){
+    dims();
+    renderer.setSize(W,H,false);
+    dummyRT.dispose();dummyRT=mkRT(W,H);
+    dummyRT.texture.wrapS=T.RepeatWrapping;dummyRT.texture.wrapT=T.RepeatWrapping;
+    displayMat.uniforms.uScene.value=dummyRT.texture;
+    for(const cam of[dummyCam,mainCam]){
+      cam.left=-W/2;cam.right=W/2;cam.top=H/2;cam.bottom=-H/2;cam.updateProjectionMatrix();
+    }
+    displayMesh.geometry.dispose();displayMesh.geometry=new T.PlaneGeometry(W,H);
+    if(gridBuilt)buildGrid();
+  }
+  function step(dt,now){
+    const tick=Math.min(dt,0.05);
+    time+=tick*0.24;noiseCb+=tick*0.6;
+    // gallery scroll follows stage progress through the sphere dwell (iris in frozen at 0, sheet out parked at end)
+    const maxY=Math.max(1,document.documentElement.scrollHeight-innerHeight);
+    const p=clamp(scrollY/maxY,0,1);
+    const st=window.__stage||{a:0,b:-1};
+    const s1e=SEG[1][1],s2s=SEG[2][0];
+    const sweep=Math.max(0,galleryHeight-400);
+    let gT;
+    if(st.b===2)gT=(st.u||0)*400; // morph in as the iris opens
+    else if(st.a===2&&st.b<0)gT=400+clamp((p-s1e)/Math.max(1e-6,s2s-s1e),0,1)*sweep;
+    else if(st.a===2&&st.b===3)gT=galleryHeight;
+    else gT=(st.a<2)?0:galleryHeight;
+    easeTarget=Math.min(gT/400,1);alphaTarget=0.7+easeTarget*0.3;
+    ease+=(easeTarget-ease)*0.055;alpha+=(alphaTarget-alpha)*0.055;
+    scrollSmooth+=(gT-scrollSmooth)*0.12;
+    for(let i=0;i<thumbMeshes.length;i++){
+      thumbMeshes[i].position.y=H/2-MAX_IMAGE_H/2-Math.floor(i/COLS)*GAP_Y+scrollSmooth;
+    }
+    if(enterMat)enterMat.opacity=0.55+0.35*Math.sin(now*0.004);
+    noiseMat.uniforms.cb.value=noiseCb;
+    renderer.setRenderTarget(noiseRT);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(noiseScene,noiseCam);
+    mouseMat.uniforms.uPrev.value=mouseRTA.texture;
+    renderer.setRenderTarget(mouseRTB);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(mouseScene,mouseCam);
+    const o=mouseRTA;mouseRTA=mouseRTB;mouseRTB=o;
+    displayMat.uniforms.uMouse.value=mouseRTA.texture;
+    renderer.setRenderTarget(dummyRT);renderer.setClearColor(0x0f0f0f,1);renderer.clear();renderer.render(dummyScene,dummyCam);
+    displayMat.uniforms.time.value=time;displayMat.uniforms.ease.value=ease;displayMat.uniforms.alpha.value=alpha;
+    renderer.setRenderTarget(null);renderer.setClearColor(0x0f0f0f,1);renderer.clear();renderer.render(mainScene,mainCam);
+    if(titleEl)titleEl.style.opacity=1.0-ease*0.85;
+  }
+  function slotHit(cx,cy){
+    if(!gridBuilt||GAP_X<=0)return false;
+    const ci=CELLS-1,cc=ci%COLS,cr=Math.floor(ci/COLS);
+    const sx=(cc-(COLS-1)/2)*GAP_X, sy=H/2-MAX_IMAGE_H/2-cr*GAP_Y+scrollSmooth;
+    const wx=cx-W/2, wy=H/2-cy;
+    return Math.abs(wx-sx)<CELL_W/2+24&&Math.abs(wy-sy)<MAX_IMAGE_H/2+24;
+  }
+  function boot(){
+    if(boot._p)return boot._p;
+    boot._p=(async()=>{
+      T=await import('https://esm.sh/three@0.160.0');
+      const canvas=document.getElementById('homc');
+      renderer=new T.WebGLRenderer({canvas,antialias:false,alpha:false});
+      renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+      noiseRT=mkRT(256,256);
+      noiseScene=new T.Scene();
+      noiseCam=new T.OrthographicCamera(-128,128,128,-128,0,100);noiseCam.position.z=10;
+      noiseMat=new T.ShaderMaterial({vertexShader:noiseVtx,fragmentShader:noiseFrg,uniforms:{cr:{value:7},cg:{value:5},cb:{value:0}}});
+      noiseScene.add(new T.Mesh(new T.PlaneGeometry(256,256),noiseMat));
+      mouseRTA=mkRT(256,256);mouseRTB=mkRT(256,256);
+      mouseScene=new T.Scene();
+      mouseCam=new T.OrthographicCamera(-128,128,128,-128,0,100);mouseCam.position.z=10;
+      mouseMat=new T.ShaderMaterial({vertexShader:mouseVtx,fragmentShader:mouseFrg,
+        uniforms:{uPrev:{value:mouseRTA.texture},uMouse:{value:new T.Vector2(9999,9999)},uDecay:{value:0.95}}});
+      mouseScene.add(new T.Mesh(new T.PlaneGeometry(256,256),mouseMat));
+      mouseUV=mouseMat.uniforms.uMouse.value;
+      addEventListener('mousemove',e=>{mouseUV.set(e.clientX/Math.max(1,innerWidth),1.0-e.clientY/Math.max(1,innerHeight))});
+      dummyRT=mkRT(2,2);
+      dummyRT.texture.wrapS=T.RepeatWrapping;dummyRT.texture.wrapT=T.RepeatWrapping;
+      dummyScene=new T.Scene();
+      dummyCam=new T.OrthographicCamera(-1,1,1,-1,0,2000);dummyCam.position.z=1000;
+      backgroundMesh=new T.Mesh(new T.PlaneGeometry(99999,99999),new T.MeshBasicMaterial({color:0x0f0f0f}));
+      backgroundMesh.position.z=-10;dummyScene.add(backgroundMesh);
+      const ec=document.createElement('canvas');ec.width=256;ec.height=352;
+      const g=ec.getContext('2d');
+      g.clearRect(0,0,256,352);
+      g.strokeStyle='rgba(201,162,39,0.95)';g.lineWidth=3;g.strokeRect(8,8,240,336);
+      g.strokeStyle='rgba(201,162,39,0.4)';g.lineWidth=1;g.strokeRect(16,16,224,320);
+      g.fillStyle='#e8c85a';g.textAlign='center';
+      g.font='700 30px Arial';g.fillText('RESERVED',128,158);
+      g.fillStyle='rgba(232,200,90,0.75)';g.font='15px Arial';g.fillText('YOUR SLOT',128,186);
+      g.fillStyle='rgba(232,200,90,0.9)';g.font='26px Arial';g.fillText('↓',128,228);
+      enterTex=new T.CanvasTexture(ec);enterTex.colorSpace=T.SRGBColorSpace;
+      enterTex.minFilter=T.LinearFilter;enterTex.magFilter=T.LinearFilter;
+      const fc=document.createElement('canvas');fc.width=fc.height=64;
+      const fx=fc.getContext('2d');fx.fillStyle='#202020';fx.fillRect(0,0,64,64);
+      fx.strokeStyle='#777';fx.strokeRect(3,3,58,58);fx.fillStyle='#ddd';fx.font='10px Arial';fx.textAlign='center';fx.fillText('IMAGE',32,35);
+      fallbackTexture=new T.CanvasTexture(fc);fallbackTexture.colorSpace=T.SRGBColorSpace;
+      mainScene=new T.Scene();
+      mainCam=new T.OrthographicCamera(-1,1,1,-1,0,100);mainCam.position.z=10;
+      displayMat=new T.ShaderMaterial({vertexShader:displayVtx,fragmentShader:displayFrg,
+        uniforms:{uScene:{value:dummyRT.texture},uMouse:{value:mouseRTA.texture},uNoise:{value:noiseRT.texture},
+        time:{value:0},ease:{value:0},alpha:{value:0.9},meEase:{value:0.08},mfBlack:{value:0.4},distA:{value:0.64},distB:{value:2.5}},
+        transparent:true,depthWrite:false});
+      displayMesh=new T.Mesh(new T.PlaneGeometry(2,2),displayMat);mainScene.add(displayMesh);
+      titleEl=document.getElementById('g-title');
+      loader=new T.TextureLoader();
+      textures=new Array(URLS.length);doneFlags=new Array(URLS.length).fill(false);
+      finishedCount=0;failedCount=0;gridBuilt=false;
+      URLS.forEach((url,index)=>{
+        loader.load(url,texture=>settleImage(index,texture,true),undefined,()=>settleImage(index,null,false));
+      });
+      sizeAll();
+      live=true;
+    })();
+    return boot._p;
+  }
+  let pd=null;
+  sc.addEventListener('pointerdown',e=>{pd={x:e.clientX,y:e.clientY,t:performance.now()};});
+  sc.addEventListener('pointerup',e=>{
+    if(window.__lensOpen&&window.__lensOpen())return; // inspection lens open: clicks belong to it
+    if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y,ok=performance.now()-pd.t<500;pd=null;
+    if(!ok||dx*dx+dy*dy>64)return;
+    const st=window.__stage||{a:0,b:-1};
+    if(!(st.a===2&&st.b<0))return;
+    if(!slotHit(e.clientX,e.clientY))return;
+    const maxY=Math.max(1,document.documentElement.scrollHeight-innerHeight);
+    window.scrollTo({top:0.70*maxY,behavior:'smooth'});
   });
-  const end=()=>{dragging=false;sc.classList.remove('drag')};
-  sc.addEventListener('pointerup',end);sc.addEventListener('pointercancel',end);
-  let pd=0,pz=0;
-  sc.addEventListener('touchstart',e=>{if(e.touches.length!==2)return;const[a,b]=e.touches;pd=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);pz=tz},{passive:true});
-  sc.addEventListener('touchmove',e=>{if(e.touches.length!==2||!pd)return;e.preventDefault();const[a,b]=e.touches;
-    tz=clamp(pz+(Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)-pd)*2.2,restZoom+C.zoomMin,restZoom+zoomMaxRel)},{passive:false});
-  sc.addEventListener('touchend',()=>pd=0,{passive:true});
-  addEventListener('resize',()=>{const o=tz-restZoom;measure();layout();tz=clamp(restZoom+o,restZoom+C.zoomMin,restZoom+zoomMaxRel)});
-  return{push(d){py+=d*.06},resize(){measure();layout()},frame(){
-    ik=intro();const dk=Math.max(0,ik-ip);ip=ik;
-    if(!dragging)py+=C.idle+C.introTurn*dk;
-    const ax=px*C.ease,ay=py*C.ease;
-    if(ax||ay){px-=ax;py-=ay;rot=mMul(mMul(ry(ay*D),rx(ax*D)),rot);if((++fc&63)===0)rot=ortho(rot)}
-    zoom+=(tz-zoom)*C.zoomEase;
-    const R=rot,k=C.introFrom+(1-C.introFrom)*ik;
-    st.style.transform=`scale3d(${k},${k},${k}) matrix3d(${R[0]},${R[3]},${R[6]},0,${R[1]},${R[4]},${R[7]},0,${R[2]},${R[5]},${R[8]},0,0,0,${zoom},1)`;
-    const inv=`matrix3d(${R[0]},${R[1]},${R[2]},0,${R[3]},${R[4]},${R[5]},0,${R[6]},${R[7]},${R[8]},0,0,0,0,1)`;
-    for(let i=0;i<items.length;i++){
-      const p=pos[i];
-      const wx=R[0]*p[0]+R[1]*p[1]+R[2]*p[2],wy=R[3]*p[0]+R[4]*p[1]+R[5]*p[2],az=Math.abs(R[6]*p[0]+R[7]*p[1]+R[8]*p[2]);
-      items[i].style.transform=`translate3d(${p[0].toFixed(2)}px,${p[1].toFixed(2)}px,${p[2].toFixed(2)}px) ${inv} rotateY(${(Math.atan2(wx,az)/D).toFixed(2)}deg) rotateX(${(Math.atan2(-wy,Math.hypot(wx,az))/D).toFixed(2)}deg) translate(-50%,-50%)`;
-    }
+  sc.addEventListener('pointermove',e=>{
+    const st=window.__stage||{a:0,b:-1};
+    const cv=document.getElementById('homc');
+    cv.style.cursor=(st.a===2&&st.b<0&&slotHit(e.clientX,e.clientY))?'pointer':'';
+  });
+  boot().catch(e=>{window.__guildErr=String((e&&e.stack)||e).slice(0,300)});
+  return{push(){},resize(){if(live)sizeAll();},frame(dt,now){
+    if(!live){boot().catch(()=>{});return;}
+    step(dt,now);
   }};
 })();
+
 
 /* ================= PATH GALLERY + MINIMAP ================= */
 scenes.path=(()=>{
@@ -2290,6 +2603,216 @@ new ResizeObserver(()=>{
   update();
 }).observe(stage);
 update();requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* --- LENS viewer: watermark-free rebuild of the ShaderLab magnify-lens composition ---
+   Layers: (1) procedural dark animated backdrop (stands in for the missing
+   video_texture.mp4, darken blend), (2) cursor-following magnify lens
+   (radius / softness / chroma aberration), (3) Abaddon portrait at scale 0.41.
+   Opens when the viewer taps Abaddon's card in the guild grid.
+   Tunables in LENS_CFG. If the real video file shows up, wire it in as a
+   second texture uniform blended with min() like the portrait. */
+(()=>{
+const LENS_CFG={scale:0.41, radius:0.5, zoom:1.0, chroma:0.05, soft:1.0};
+const sc=document.getElementById('s-sphere'),ov=document.getElementById('lens'),cv=document.getElementById('lensc');
+const btn=document.getElementById('lensX');
+const label=document.getElementById('lensLabel');
+function nameOf(i){try{const u=(window.__cardSrc&&window.__cardSrc(i))||'';const f=decodeURIComponent(u.split('/').pop()||'').replace(/\.[a-z0-9]+$/i,'');const p=f.split(',');return{t:(((p[0]||'').trim()||'PORTRAIT').toUpperCase()),s:p.slice(1).join(',').trim()};}catch(e){return{t:'PORTRAIT',s:''};}}
+let lensOpen=false,raf=0,imgOK=false,texTried=false;
+const mouse={x:0,y:0};
+window.__lensOpen=()=>lensOpen;
+const gl=cv.getContext('webgl',{antialias:false,alpha:false,depth:false,stencil:false,powerPreference:'high-performance'});
+if(!gl){window.__lensErr='no webgl';return;}
+const VERT='attribute vec2 aPos;void main(){gl_Position=vec4(aPos,0.,1.);}';
+const FRAG=[
+'precision highp float;',
+'uniform sampler2D uImg;',
+'uniform vec2 uRes;',
+'uniform vec2 uLens;',
+'uniform float uTime,uRadius,uZoom,uChroma,uSoft,uImgAspect,uScale,uHasImg;',
+'uniform sampler2D uVideo;',
+'uniform float uHasVideo,uVidAspect;',
+'float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
+'float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);',
+' return mix(mix(hash(i),hash(i+vec2(1.,0.)),u.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),u.x),u.y);}',
+'float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*vnoise(p);p*=2.03;a*=.5;}return v;}',
+'vec3 backdrop(vec2 ac){',
+' float t=uTime;',
+' float n1=fbm(ac*2.3+vec2(t*.06,-t*.04));',
+' float n2=fbm(ac*5.1+vec2(-t*.05,t*.07));',
+' vec3 col=mix(vec3(.012,.010,.013),vec3(.16,.11,.12),n1);',
+' col+=vec3(.11,.035,.02)*pow(n2,3.)*1.2;',
+' float vig=length(vec2(ac.x/(uRes.x/uRes.y),ac.y)*2.);',
+' col*=smoothstep(1.45,.3,vig);',
+' return col;}',
+'float frame(vec2 ac,out vec2 tuv){',
+' tuv=vec2(.5+ac.x/(uScale*uImgAspect),.5+ac.y/uScale);',
+' return (tuv.x>=0.&&tuv.x<=1.&&tuv.y>=0.&&tuv.y<=1.)?1.:0.;}',
+'vec3 bgAt(vec2 p){',
+' vec2 ac=(p/uRes-.5);ac.x*=uRes.x/uRes.y;',
+' vec3 bg=backdrop(ac);',
+' bg+=(hash(p+fract(uTime)*13.)-.5)*.04;',
+' return bg;}',
+'vec3 videoOver(vec2 p){',
+' vec2 ac=(p/uRes-.5);ac.x*=uRes.x/uRes.y;',
+' float hva=max(1.,(uRes.x/uRes.y)/uVidAspect);',
+' vec2 tuv=vec2(.5+ac.x/(hva*uVidAspect),.5+ac.y/hva);',
+' vec3 v=texture2D(uVideo,tuv).rgb;',
+' float vig=length(vec2(ac.x/(uRes.x/uRes.y),ac.y)*2.);',
+' v*=mix(.55,1.,smoothstep(1.45,.3,vig));',
+' v+=(hash(p+fract(uTime)*13.)-.5)*.03;',
+' return v;}',
+'vec3 portraitOver(vec3 bg,vec2 p){',
+' vec2 ac=(p/uRes-.5);ac.x*=uRes.x/uRes.y;',
+' vec2 tuv;',
+' if(uHasImg>.5&&frame(ac,tuv)>.5){return texture2D(uImg,tuv).rgb;}',
+' return bg;}',
+'void main(){',
+' float d=length(gl_FragCoord.xy-uLens);',
+' float R=uRadius;',
+' float edge=1.-smoothstep(R*(1.-uSoft),R,d);',
+' vec3 base=(uHasVideo>.5)?videoOver(gl_FragCoord.xy):bgAt(gl_FragCoord.xy);',
+' vec3 col=base;',
+' if(edge>.002){',
+'  vec2 toC=gl_FragCoord.xy-uLens;',
+'  vec2 dir=d>1e-4?toC/d:vec2(0.);',
+'  vec2 zc=uLens+toC/uZoom;',
+'  vec2 off=dir*(uChroma*R);',
+'  vec3 m;',
+'  m.r=bgAt(zc+off).r;',
+'  m.g=bgAt(zc).g;',
+'  m.b=bgAt(zc-off).b;',
+'  float glow=(1.-smoothstep(R*.86,R,d))*smoothstep(R*.4,R*.9,d);',
+'  m+=vec3(.05,.04,.03)*glow;',
+'  col=mix(base,m,edge);',
+' }',
+' col=portraitOver(col,gl_FragCoord.xy);',
+' float ring=1.-smoothstep(0.,2.5,abs(d-R));',
+' col+=vec3(.85,.68,.32)*ring*.5;',
+' gl_FragColor=vec4(col,1.);}'].join('\n');
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+ if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)){window.__lensErr=gl.getShaderInfoLog(o);return null;}return o;}
+const vs=sh(gl.VERTEX_SHADER,VERT),fs=sh(gl.FRAGMENT_SHADER,FRAG);
+if(!vs||!fs)return;
+const pg=gl.createProgram();gl.attachShader(pg,vs);gl.attachShader(pg,fs);
+gl.bindAttribLocation(pg,0,'aPos');gl.linkProgram(pg);gl.useProgram(pg);
+if(!gl.getProgramParameter(pg,gl.LINK_STATUS)){window.__lensErr=gl.getProgramInfoLog(pg);return;}
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+const loc={};function uni(n){return loc[n]||(loc[n]=gl.getUniformLocation(pg,n));}
+const tex=gl.createTexture();
+let openIdx=0,reqSeq=0;const texCache={};
+function bindImg(img){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
+ gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,img);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ gl.uniform1f(uni('uImgAspect'),img.naturalWidth/Math.max(1,img.naturalHeight));}
+function loadTex(i){
+ const my=++reqSeq;texTried=true;
+ const c=texCache[i];
+ if(c){bindImg(c);if(my===reqSeq)imgOK=true;return;}
+ if(my===reqSeq)imgOK=false;
+ const img=new Image();img.crossOrigin='anonymous';
+ img.onload=()=>{texCache[i]=img;if(my!==reqSeq)return;bindImg(img);imgOK=true;};
+ img.onerror=()=>{if(my===reqSeq)window.__lensErr='portrait load failed';};
+ img.src=(window.__cardSrc&&window.__cardSrc(i))||((typeof SPH_SRC!=='undefined'&&SPH_SRC[i])||'');
+}
+const vtex=gl.createTexture();
+let videoOK=false,vidTried=false,vidCanvas=null;
+window.__lensTestSrc=(el)=>{vidCanvas=el||null;if(el){videoOK=true;vidTried=true;}};
+const vid=document.createElement('video');
+vid.crossOrigin='anonymous';vid.muted=true;vid.loop=true;vid.playsInline=true;vid.preload='auto';
+vid.addEventListener('loadedmetadata',()=>{if(vid.videoWidth)gl.uniform1f(uni('uVidAspect'),vid.videoWidth/Math.max(1,vid.videoHeight));});
+vid.addEventListener('canplay',()=>{videoOK=true;});
+function loadVideo(){
+ vidTried=true;
+ gl.uniform1i(uni('uVideo'),1);
+ gl.uniform1f(uni('uVidAspect'),16/9);
+ gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,vtex);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ gl.activeTexture(gl.TEXTURE0);
+ vid.src='https://user.uploads.dev/file/9d42ba4b8a916ba8021a1119ec1b15e1.mp4';
+ try{vid.load();const pr=vid.play();if(pr&&pr.catch)pr.catch(()=>{});}catch(e){}
+}
+function resize(){
+ const s=Math.min(devicePixelRatio||1,1.5);
+ const w=Math.max(2,Math.round(ov.clientWidth*s)),h=Math.max(2,Math.round(ov.clientHeight*s));
+ if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h);}
+}
+function draw(now){
+ gl.uniform2f(uni('uRes'),cv.width,cv.height);
+ gl.uniform2f(uni('uLens'),mouse.x,mouse.y);
+ gl.uniform1f(uni('uTime'),(now/1000)%1000);
+ gl.uniform1f(uni('uRadius'),LENS_CFG.radius*Math.min(cv.width,cv.height));
+ gl.uniform1f(uni('uZoom'),LENS_CFG.zoom);
+ gl.uniform1f(uni('uChroma'),LENS_CFG.chroma);
+ gl.uniform1f(uni('uSoft'),LENS_CFG.soft);
+ gl.uniform1f(uni('uScale'),LENS_CFG.scale);
+ gl.uniform1f(uni('uHasImg'),imgOK?1:0);
+ if(videoOK&&(vidCanvas||vid.readyState>=2)){
+  try{
+   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,vtex);
+   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,vidCanvas||vid);
+   gl.activeTexture(gl.TEXTURE0);
+   gl.uniform1f(uni('uHasVideo'),1);
+  }catch(e){videoOK=false;window.__lensErr='video CORS blocked, procedural backdrop';gl.uniform1f(uni('uHasVideo'),0);}
+ }else gl.uniform1f(uni('uHasVideo'),0);
+ if(!imgOK)gl.uniform1f(uni('uImgAspect'),0.72);
+ gl.drawArrays(gl.TRIANGLES,0,3);
+}
+function frame(now){if(!lensOpen)return;draw(now);raf=requestAnimationFrame(frame);}
+function toPx(e){const r=cv.getBoundingClientRect();
+ return [(e.clientX-r.left)/Math.max(1,r.width)*cv.width,(1-(e.clientY-r.top)/Math.max(1,r.height))*cv.height];}
+function open(i,x,y){
+ if(typeof i!=='number')i=0;
+ if(lensOpen&&i===openIdx&&typeof x!=='number')return;
+ lensOpen=true;ov.hidden=false;openIdx=i;loadTex(i);
+ try{const nm=nameOf(i);label.innerHTML=nm.t+(nm.s?' &middot; '+nm.s:'')+'<small>magnify lens &middot; move to inspect</small>';}catch(e){}
+ resize();
+ if(typeof x==='number'){const r=cv.getBoundingClientRect();
+  mouse.x=(x-r.left)/Math.max(1,r.width)*cv.width;mouse.y=(1-(y-r.top)/Math.max(1,r.height))*cv.height;}
+ else{mouse.x=cv.width/2;mouse.y=cv.height/2;}
+ cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
+ if(vidTried&&vid.paused){try{const pr=vid.play();if(pr&&pr.catch)pr.catch(()=>{});}catch(e){}}
+}
+function close(){if(!lensOpen)return;lensOpen=false;cancelAnimationFrame(raf);ov.hidden=true;}
+btn.addEventListener('click',e=>{e.stopPropagation();close();});
+addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+ov.addEventListener('pointermove',e=>{const p=toPx(e);mouse.x=p[0];mouse.y=p[1];},{passive:true});
+ov.addEventListener('pointerdown',e=>{const p=toPx(e);mouse.x=p[0];mouse.y=p[1];},{passive:true});
+addEventListener('resize',()=>{if(lensOpen)resize();});
+let lpd=null;
+sc.addEventListener('pointerdown',e=>{lpd={x:e.clientX,y:e.clientY,t:performance.now()};},{passive:true});
+sc.addEventListener('pointerup',e=>{
+ if(!lpd)return;const dx=e.clientX-lpd.x,dy=e.clientY-lpd.y,ok=performance.now()-lpd.t<500;lpd=null;
+ if(!ok||dx*dx+dy*dy>64||lensOpen)return;
+ const st=window.__stage||{a:0,b:-1};
+ if(!(st.a===2&&st.b<0))return;
+ if(e.target&&e.target.closest&&e.target.closest('#lens'))return;
+ const h=window.__cardHit&&window.__cardHit(e.clientX,e.clientY);
+ if(typeof h==='number'&&h>=0)open(h,e.clientX,e.clientY);
+});
+window.__lensVid=()=>({rs:vid.readyState,net:vid.networkState,paused:vid.paused,err:vid.error?vid.error.code:0,src:(vid.currentSrc||'').slice(-24)});
+window.__lens={open,close,shot(){const was=lensOpen;if(!was){ov.hidden=false;resize();}
+ loadTex(openIdx);draw(performance.now());const u=cv.toDataURL();if(!was)ov.hidden=true;return u;},
+ probe(){const was=lensOpen;if(!was){ov.hidden=false;resize();}
+ loadTex(openIdx);mouse.x=cv.width/2;mouse.y=cv.height/2;draw(performance.now());
+ const px=new Uint8Array(4);const R=LENS_CFG.radius*Math.min(cv.width,cv.height);
+ const pts=[[cv.width/2|0,cv.height/2|0],[cv.width/2+R|0,cv.height/2|0],[20,20]];
+ const cols=pts.map(pt=>{gl.readPixels(pt[0],pt[1],1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);return[px[0],px[1],px[2]];});
+ if(!was)ov.hidden=true;return{size:[cv.width,cv.height],R:R|0,img:imgOK,err:window.__lensErr||null,cols};},
+ ready(){return new Promise(res=>{if(imgOK)return res(true);const iv=setInterval(()=>{if(imgOK){clearInterval(iv);res(true);}},200);
+  setTimeout(()=>{clearInterval(iv);res(imgOK);},15000);});},
+ state(){return{open:lensOpen,img:imgOK,vid:videoOK&&vid.readyState>=2,err:window.__lensErr||null};}};
+loadTex(0);loadVideo();
 })();
 </script>
 <script>
